@@ -1,0 +1,55 @@
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { productController } from "./controllers/product.controller";
+import { salesController } from "./controllers/sales.controller";
+import { authController } from "./controllers/auth.controller";
+import { employeesController } from "./controllers/employees.controller";
+import { transactionsController } from "./controllers/transactions.controller";
+import { storeController } from "./controllers/store.controller";
+import { usersController } from "./controllers/users.controller";
+import { reportsController } from "./controllers/reports.controller";
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Auth routes
+  app.post("/api/auth/login", authController.login);
+  app.post("/api/auth/logout", authController.logout);
+  app.get("/api/auth/me", authController.me);
+
+  // Product routes
+  app.get("/api/products", productController.getAll);
+  app.get("/api/products/search", productController.search);
+  app.get("/api/products/:id", productController.getById);
+  app.post("/api/products", productController.create);
+  app.put("/api/products/:id", productController.update);
+  app.delete("/api/products/:id", productController.delete);
+
+  // Sales routes
+  app.get("/api/sales", salesController.getAll);
+  app.get("/api/sales/today-summary", salesController.getTodaySummary);
+  app.get("/api/sales/:id", salesController.getById);
+  app.post("/api/sales", salesController.create);
+
+  // Employees routes
+  app.get("/api/employees", employeesController.getAll);
+  app.post("/api/employees", employeesController.create);
+  app.put("/api/employees/:id", employeesController.update);
+
+  // Transactions (Finance) routes
+  app.get("/api/transactions", transactionsController.getAll);
+  app.post("/api/transactions", transactionsController.create);
+
+  // Store settings routes
+  app.get("/api/store-settings", storeController.getAll);
+  app.put("/api/store-settings", storeController.update);
+
+  // Users (Settings) routes
+  app.get("/api/users", usersController.getAll);
+  app.post("/api/users", usersController.create);
+
+  // Reports routes
+  app.get("/api/reports/overview", reportsController.getOverview);
+
+  const httpServer = createServer(app);
+
+  return httpServer;
+}

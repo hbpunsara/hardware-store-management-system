@@ -1,0 +1,201 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --nintendo-red: #E60012;
+  --nintendo-red-dark: #C4000F;
+  --nintendo-gray: #484848;
+  --nintendo-light-gray: #F5F5F5;
+  --nintendo-white: #FFFFFF;
+  --nintendo-black: #1A1A1A;
+  --nintendo-blue: #0AB5CD;
+  --nintendo-green: #7AC143;
+  --nintendo-yellow: #F5A623;
+  --nintendo-purple: #9B59B6;
+  
+  --background: 0 0% 96%;
+  --foreground: 0 0% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 10%;
+  --primary: 354 100% 45%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 96%;
+  --secondary-foreground: 0 0% 10%;
+  --muted: 0 0% 90%;
+  --muted-foreground: 0 0% 40%;
+  --accent: 186 100% 42%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 88%;
+  --input: 0 0% 88%;
+  --ring: 354 100% 45%;
+  --radius: 1rem;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--nintendo-light-gray);
+  color: var(--nintendo-black);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .nintendo-card {
+    @apply bg-white rounded-2xl shadow-lg border-2 border-gray-100 transition-all duration-200;
+  }
+  
+  .nintendo-card:hover {
+    @apply shadow-xl transform -translate-y-0.5;
+  }
+  
+  .nintendo-btn {
+    @apply font-bold rounded-xl px-6 py-3 transition-all duration-200 transform;
+  }
+  
+  .nintendo-btn:hover {
+    @apply -translate-y-0.5;
+  }
+  
+  .nintendo-btn:active {
+    @apply translate-y-0.5;
+  }
+  
+  .nintendo-btn-primary {
+    @apply bg-[#E60012] text-white shadow-lg;
+    box-shadow: 0 4px 0 #C4000F;
+  }
+  
+  .nintendo-btn-primary:hover {
+    @apply bg-[#FF1A2C];
+  }
+  
+  .nintendo-btn-primary:active {
+    box-shadow: 0 2px 0 #C4000F;
+  }
+  
+  .nintendo-btn-secondary {
+    @apply bg-gray-200 text-gray-800 shadow-md;
+    box-shadow: 0 4px 0 #D1D5DB;
+  }
+  
+  .nintendo-btn-secondary:hover {
+    @apply bg-gray-300;
+  }
+  
+  .nintendo-input {
+    @apply w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-[#E60012] focus:outline-none transition-colors duration-200 font-medium;
+  }
+  
+  .nintendo-sidebar {
+    @apply bg-gradient-to-b from-[#1A1A1A] to-[#2D2D2D] text-white;
+  }
+  
+  .nintendo-nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all duration-200;
+  }
+  
+  .nintendo-nav-item:hover {
+    @apply bg-white/10;
+  }
+  
+  .nintendo-nav-item.active {
+    @apply bg-[#E60012] text-white;
+  }
+  
+  .nintendo-badge {
+    @apply px-3 py-1 rounded-full text-xs font-bold;
+  }
+  
+  .nintendo-badge-success {
+    @apply bg-[#7AC143]/20 text-[#5A9132];
+  }
+  
+  .nintendo-badge-warning {
+    @apply bg-[#F5A623]/20 text-[#C4850E];
+  }
+  
+  .nintendo-badge-danger {
+    @apply bg-[#E60012]/20 text-[#E60012];
+  }
+  
+  .nintendo-badge-info {
+    @apply bg-[#0AB5CD]/20 text-[#0AB5CD];
+  }
+  
+  .nintendo-stat-card {
+    @apply bg-white rounded-2xl p-5 shadow-lg border-2 border-gray-100;
+  }
+  
+  .nintendo-table {
+    @apply w-full;
+  }
+  
+  .nintendo-table thead {
+    @apply bg-gray-50;
+  }
+  
+  .nintendo-table th {
+    @apply px-4 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wide;
+  }
+  
+  .nintendo-table td {
+    @apply px-4 py-4 text-sm;
+  }
+  
+  .nintendo-table tbody tr {
+    @apply border-b border-gray-100 transition-colors duration-200;
+  }
+  
+  .nintendo-table tbody tr:hover {
+    @apply bg-gray-50;
+  }
+}
+
+@keyframes bounce-subtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(230, 0, 18, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px 5px rgba(230, 0, 18, 0.2);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
