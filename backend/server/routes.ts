@@ -8,6 +8,8 @@ import { transactionsController } from "./controllers/transactions.controller";
 import { storeController } from "./controllers/store.controller";
 import { usersController } from "./controllers/users.controller";
 import { reportsController } from "./controllers/reports.controller";
+import { payrollController } from "./controllers/payroll.controller";
+import { systemController } from "./controllers/system.controller";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -46,8 +48,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/users", usersController.getAll);
   app.post("/api/users", usersController.create);
 
+  // Payroll routes
+  app.get("/api/payroll", payrollController.getAll);
+  app.post("/api/payroll/calculate", payrollController.calculateAll);
+  app.post("/api/payroll/process", payrollController.processAll);
+
   // Reports routes
   app.get("/api/reports/overview", reportsController.getOverview);
+  app.get("/api/reports/forecasting", reportsController.getForecasting);
+  app.get("/api/reports/basket-analysis", reportsController.getBasketAnalysis);
+  app.get("/api/reports/insights", reportsController.getInsights);
+
+  // System routes
+  app.get("/api/system/status", systemController.getStatus);
 
   const httpServer = createServer(app);
 

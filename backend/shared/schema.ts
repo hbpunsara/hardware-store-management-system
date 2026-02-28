@@ -1,19 +1,26 @@
 import { sql } from "drizzle-orm";
 import {
-  pgTable,
+  sqliteTable,
   text,
-  varchar,
   integer,
-  decimal,
-  timestamp,
-  serial,
-} from "drizzle-orm/pg-core";
+  real,
+} from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Sync Queue for Offline
+export const syncQueue = sqliteTable("sync_queue", {
+  id: integer("id", { mode: 'number' }).primaryKey({ autoIncrement: true }),
+  tableName: text("table_name").notNull(),
+  operation: text("operation").notNull(), // INSERT, UPDATE, DELETE
+  recordId: text("record_id").notNull(),  // Assuming PKs can be cast to string
+  payload: text("payload").notNull(), // JSON string
+  createdAt: text("created_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+});
+
 // Users (auth + staff)
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(), // using text since SQLite UUIDs are text
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name"),
@@ -22,8 +29,8 @@ export const users = pgTable("users", {
 });
 
 // Employees (attendance / staff list)
-export const employees = pgTable("employees", {
-  id: serial("id").primaryKey(),
+export const employees = sqliteTable("employees", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   role: text("role").notNull(),
   department: text("department").notNull(),
@@ -32,24 +39,31 @@ export const employees = pgTable("employees", {
   checkOut: text("check_out"),
   hours: text("hours"),
   avatar: text("avatar"),
+  // Sync metadata
+  isSynced: integer("is_synced", { mode: 'boolean' }).default(false).notNull(),
+  updatedAt: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
 });
 
 // Finance transactions
-export const transactions = pgTable("transactions", {
-  id: serial("id").primaryKey(),
+export const transactions = sqliteTable("transactions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   date: text("date").notNull(),
   description: text("description").notNull(),
   category: text("category").notNull(),
   type: text("type").notNull(),
-  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  amount: real("amount").notNull(),
   method: text("method").notNull(),
+  isSynced: integer("is_synced", { mode: 'boolean' }).default(false).notNull(),
+  updatedAt: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
 });
 
 // Store settings (key-value)
-export const storeSettings = pgTable("store_settings", {
-  id: serial("id").primaryKey(),
+export const storeSettings = sqliteTable("store_settings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   key: text("key").notNull().unique(),
   value: text("value"),
+  isSynced: integer("is_synced", { mode: 'boolean' }).default(false).notNull(),
+  updatedAt: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -62,14 +76,16 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
 // Products
-export const products = pgTable("products", {
-  id: serial("id").primaryKey(),
+export const products = sqliteTable("products", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   sku: text("sku").notNull().unique(),
   name: text("name").notNull(),
   category: text("category").notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  price: real("price").notNull(),
   stock: integer("stock").notNull().default(0),
   supplier: text("supplier"),
+  isSynced: integer("is_synced", { mode: 'boolean' }).default(false).notNull(),
+  updatedAt: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
 });
 
 export const insertProductSchema = createInsertSchema(products);
@@ -77,27 +93,29 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 
 // Sales (header)
-export const sales = pgTable("sales", {
-  id: serial("id").primaryKey(),
-  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
-  tax: decimal("tax", { precision: 12, scale: 2 }).notNull().default("0"),
-  discount: decimal("discount", { precision: 12, scale: 2 }).notNull().default("0"),
-  total: decimal("total", { precision: 12, scale: 2 }).notNull(),
+export const sales = sqliteTable("sales", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  subtotal: real("subtotal").notNull(),
+  tax: real("tax").notNull().default(0),
+  discount: real("discount").notNull().default(0),
+  total: real("total").notNull(),
   paymentMethod: text("payment_method").notNull(),
-  cashierId: varchar("cashier_id").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  cashierId: text("cashier_id").references(() => users.id),
+  createdAt: text("created_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+  isSynced: integer("is_synced", { mode: 'boolean' }).default(false).notNull(),
+  updatedAt: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
 });
 
 // Sale items (line items)
-export const saleItems = pgTable("sale_items", {
-  id: serial("id").primaryKey(),
+export const saleItems = sqliteTable("sale_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   saleId: integer("sale_id")
     .notNull()
     .references(() => sales.id, { onDelete: "cascade" }),
   productId: integer("product_id").references(() => products.id),
   productName: text("product_name").notNull(),
   quantity: integer("quantity").notNull(),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  price: real("price").notNull(),
 });
 
 export const insertSaleSchema = createInsertSchema(sales).omit({
@@ -109,3 +127,22 @@ export const insertSaleItemSchema = createInsertSchema(saleItems).omit({
 });
 export type Sale = typeof sales.$inferSelect;
 export type SaleItem = typeof saleItems.$inferSelect;
+
+// Payrolls
+export const payrolls = sqliteTable("payrolls", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  employeeId: integer("employee_id").notNull().references(() => employees.id, { onDelete: "cascade" }),
+  month: text("month").notNull(), // e.g. "January 2024"
+  baseSalary: real("base_salary").notNull(),
+  overtime: real("overtime").notNull().default(0),
+  allowances: real("allowances").notNull().default(0),
+  deductions: real("deductions").notNull().default(0),
+  netSalary: real("net_salary").notNull(),
+  daysWorked: integer("days_worked").notNull().default(0),
+  status: text("status").notNull().default("Pending"), // Pending, Processed
+  isSynced: integer("is_synced", { mode: 'boolean' }).default(false).notNull(),
+  updatedAt: text("updated_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+});
+export const insertPayrollSchema = createInsertSchema(payrolls);
+export type InsertPayroll = z.infer<typeof insertPayrollSchema>;
+export type Payroll = typeof payrolls.$inferSelect;

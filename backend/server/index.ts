@@ -3,6 +3,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import { registerRoutes } from "./routes";
 import { log } from "./log";
+import { startSyncDaemon } from "./syncManager";
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
@@ -47,6 +48,10 @@ app.use((req, res, next) => {
   });
 
   const port = parseInt(process.env.PORT || "5000", 10);
+
+  // Start the offline sync daemon
+  startSyncDaemon();
+
   server.listen(
     { port, host: "0.0.0.0" },
     () => {

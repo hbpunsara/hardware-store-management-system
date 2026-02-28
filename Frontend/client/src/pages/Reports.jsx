@@ -2,12 +2,12 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "../components/Sidebar";
 import { Navbar } from "../components/Navbar";
 import { Button } from "../components/Button";
-import { 
-  Download, 
-  Calendar, 
-  TrendingUp, 
-  TrendingDown, 
-  BarChart3, 
+import {
+  Download,
+  Calendar,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
   Activity,
   Brain,
   Zap,
@@ -19,42 +19,40 @@ import {
 } from "lucide-react";
 import { reportsService } from "../services/reportsService";
 
-const forecastData = [
-  { month: "Jan", actual: 45000, predicted: null },
-  { month: "Feb", actual: 52000, predicted: null },
-  { month: "Mar", actual: 48000, predicted: null },
-  { month: "Apr", actual: 61000, predicted: null },
-  { month: "May", actual: 55000, predicted: null },
-  { month: "Jun", actual: null, predicted: 58000 },
-  { month: "Jul", actual: null, predicted: 62000 },
-  { month: "Aug", actual: null, predicted: 67000 },
-];
-
-const basketAnalysis = [
-  { products: ["Hammer", "Nails", "Wood Glue"], frequency: 78, confidence: "92%" },
-  { products: ["Paint Brush", "Paint Roller", "Painter's Tape"], frequency: 65, confidence: "88%" },
-  { products: ["Screwdriver Set", "Drill Bits", "Screws"], frequency: 54, confidence: "85%" },
-  { products: ["Measuring Tape", "Level Tool", "Pencil Set"], frequency: 42, confidence: "79%" },
-];
-
-const insights = [
-  { title: "Peak Sales Hours", description: "10 AM - 12 PM shows 35% higher sales", icon: Clock, color: "bg-[#E60012]" },
-  { title: "Stock Alert", description: "Reorder Nails 2\" - running low this week", icon: Target, color: "bg-[#F5A623]" },
-  { title: "Trending Up", description: "Power tools category grew 28% this month", icon: TrendingUp, color: "bg-[#7AC143]" },
-];
+const ICON_MAP = {
+  Clock,
+  Target,
+  TrendingUp,
+  Brain,
+  Zap,
+  ShoppingBag,
+  Lightbulb
+};
 
 const REPORT_COLORS = ["bg-[#E60012]", "bg-[#0AB5CD]", "bg-[#7AC143]", "bg-[#F5A623]"];
 
 export const Reports = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [overview, setOverview] = useState(null);
+  const [forecastData, setForecastData] = useState([]);
+  const [basketAnalysis, setBasketAnalysis] = useState([]);
+  const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    reportsService.getOverview()
-      .then(setOverview)
-      .catch(() => setOverview(null))
-      .finally(() => setLoading(false));
+    setLoading(true);
+    Promise.all([
+      reportsService.getOverview().catch(() => null),
+      reportsService.getForecasting().catch(() => []),
+      reportsService.getBasketAnalysis().catch(() => []),
+      reportsService.getInsights().catch(() => [])
+    ]).then(([overviewData, forecast, basket, ins]) => {
+      setOverview(overviewData);
+      setForecastData(forecast);
+      setBasketAnalysis(basket);
+      setInsights(ins);
+      setLoading(false);
+    });
   }, []);
 
   const topProducts = overview?.topProducts?.map(p => ({
@@ -68,7 +66,7 @@ export const Reports = () => {
       <Sidebar />
       <main className="flex-1">
         <Navbar title="Reports & Analytics" />
-        
+
         <div className="p-6 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex gap-2">
@@ -76,11 +74,10 @@ export const Reports = () => {
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-5 py-2.5 rounded-xl font-bold capitalize transition-all ${
-                    activeTab === tab 
-                      ? "bg-[#E60012] text-white shadow-lg" 
+                  className={`px-5 py-2.5 rounded-xl font-bold capitalize transition-all ${activeTab === tab
+                      ? "bg-[#E60012] text-white shadow-lg"
                       : "bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   {tab}
                 </button>
@@ -151,7 +148,7 @@ export const Reports = () => {
                       const heights = [55, 72, 48, 85, 68, 92, 78];
                       return (
                         <div key={day} className="flex-1 flex flex-col items-center gap-2">
-                          <div 
+                          <div
                             className="w-full bg-gradient-to-t from-[#E60012] to-[#FF6B6B] rounded-t-lg"
                             style={{ height: `${heights[i]}%` }}
                           />
@@ -209,9 +206,8 @@ export const Reports = () => {
                           <td className="font-semibold text-gray-700">{product.sales}</td>
                           <td className="font-bold text-gray-900">LKR {(product.revenue ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                           <td>
-                            <span className={`nintendo-badge flex items-center gap-1 w-fit ${
-                              (product.trend || "+0%").startsWith('+') ? 'nintendo-badge-success' : 'nintendo-badge-danger'
-                            }`}>
+                            <span className={`nintendo-badge flex items-center gap-1 w-fit ${(product.trend || "+0%").startsWith('+') ? 'nintendo-badge-success' : 'nintendo-badge-danger'
+                              }`}>
                               {(product.trend || "+0%").startsWith('+') ? (
                                 <TrendingUp className="w-3 h-3" />
                               ) : (
@@ -248,24 +244,24 @@ export const Reports = () => {
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="h-80 flex items-end justify-between gap-3 px-4 mb-4">
                   {forecastData.map((data, i) => {
                     const maxValue = 70000;
                     const actualHeight = data.actual ? (data.actual / maxValue) * 100 : 0;
                     const predictedHeight = data.predicted ? (data.predicted / maxValue) * 100 : 0;
-                    
+
                     return (
                       <div key={data.month} className="flex-1 flex flex-col items-center gap-2">
                         <div className="w-full h-full flex items-end">
                           {data.actual && (
-                            <div 
+                            <div
                               className="w-full bg-gradient-to-t from-[#E60012] to-[#FF6B6B] rounded-t-lg"
                               style={{ height: `${actualHeight}%` }}
                             />
                           )}
                           {data.predicted && (
-                            <div 
+                            <div
                               className="w-full bg-gradient-to-t from-[#9B59B6] to-[#C39BD3] rounded-t-lg border-2 border-dashed border-[#9B59B6]"
                               style={{ height: `${predictedHeight}%` }}
                             />
@@ -281,7 +277,7 @@ export const Reports = () => {
                     );
                   })}
                 </div>
-                
+
                 <div className="flex justify-center gap-8">
                   <div className="flex items-center gap-2">
                     <div className="w-4 h-4 bg-[#E60012] rounded" />
@@ -367,7 +363,7 @@ export const Reports = () => {
                         </div>
                       </div>
                       <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-gradient-to-r from-[#0AB5CD] to-[#7AC143] rounded-full"
                           style={{ width: `${parseInt(basket.confidence)}%` }}
                         />
@@ -405,7 +401,7 @@ export const Reports = () => {
             <div className="space-y-6">
               <div className="grid grid-cols-3 gap-5">
                 {insights.map((insight, i) => {
-                  const Icon = insight.icon;
+                  const Icon = ICON_MAP[insight.icon] || Lightbulb;
                   return (
                     <div key={i} className="nintendo-card p-6">
                       <div className={`w-12 h-12 ${insight.color}/10 rounded-xl flex items-center justify-center mb-4`}>

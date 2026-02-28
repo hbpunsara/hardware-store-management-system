@@ -1,15 +1,15 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "../components/Sidebar";
 import { Navbar } from "../components/Navbar";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { useToast } from "../components/Toast";
-import { 
-  DollarSign, 
-  Users, 
-  Calendar, 
-  FileText, 
-  Download, 
+import {
+  DollarSign,
+  Users,
+  Calendar,
+  FileText,
+  Download,
   Send,
   Calculator,
   TrendingUp,
@@ -21,35 +21,58 @@ import {
   X,
   Check
 } from "lucide-react";
+import payrollService from "../services/payrollService";
 
-const initialPayrollData = [
-  { id: 1, name: "John Perera", role: "Cashier", baseSalary: 45000, overtime: 3500, allowances: 5000, deductions: 2500, netSalary: 51000, daysWorked: 24, status: "Pending" },
-  { id: 2, name: "Mary Silva", role: "Cashier", baseSalary: 45000, overtime: 2000, allowances: 5000, deductions: 2500, netSalary: 49500, daysWorked: 23, status: "Pending" },
-  { id: 3, name: "Robert Fernando", role: "Stock Manager", baseSalary: 55000, overtime: 0, allowances: 7500, deductions: 3500, netSalary: 59000, daysWorked: 25, status: "Processed" },
-  { id: 4, name: "David Wickrama", role: "Supervisor", baseSalary: 65000, overtime: 5000, allowances: 10000, deductions: 5000, netSalary: 75000, daysWorked: 26, status: "Processed" },
-  { id: 5, name: "Lisa Gunasekara", role: "Accountant", baseSalary: 60000, overtime: 0, allowances: 8000, deductions: 4000, netSalary: 64000, daysWorked: 22, status: "Pending" },
-];
+
 
 export const Payroll = () => {
   const [selectedMonth, setSelectedMonth] = useState("January 2024");
-  const [payrollData, setPayrollData] = useState(initialPayrollData);
+  const [payrollData, setPayrollData] = useState([]);
   const [showPayslipModal, setShowPayslipModal] = useState(false);
   const [showCalculatorModal, setShowCalculatorModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [loading, setLoading] = useState(true);
   const toast = useToast();
+
+  const loadPayrolls = async () => {
+    setLoading(true);
+    try {
+      const data = await payrollService.getAll(selectedMonth);
+      setPayrollData(data);
+    } catch (err) {
+      toast.error("Failed to load payroll data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPayrolls();
+  }, [selectedMonth]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-LK').format(amount);
   };
 
-  const handleProcessPayroll = () => {
-    setPayrollData(payrollData.map(emp => ({ ...emp, status: "Processed" })));
-    toast.success("All payroll processed successfully!");
+  const handleProcessPayroll = async () => {
+    try {
+      await payrollService.processAll(selectedMonth);
+      await loadPayrolls();
+      toast.success("Payroll processed successfully!");
+    } catch (err) {
+      toast.error(err.message || "Failed to process payroll");
+    }
   };
 
-  const handleCalculateAll = () => {
-    toast.success("Recalculating all salaries...");
-    setTimeout(() => toast.info("All salaries calculated!"), 1000);
+  const handleCalculateAll = async () => {
+    try {
+      toast.success("Calculating all salaries...");
+      await payrollService.calculateAll(selectedMonth);
+      await loadPayrolls();
+      toast.info("All salaries calculated!");
+    } catch (err) {
+      toast.error(err.message || "Failed to calculate payrolls");
+    }
   };
 
   const handleViewPayslip = (employee) => {
@@ -91,11 +114,11 @@ export const Payroll = () => {
       <Sidebar />
       <main className="flex-1">
         <Navbar title="Payroll Management" />
-        
+
         <div className="p-6 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex gap-3 items-center">
-              <select 
+              <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
                 className="nintendo-input w-48 py-2"
@@ -165,7 +188,11 @@ export const Payroll = () => {
                 </tr>
               </thead>
               <tbody>
-                {payrollData.map((emp) => (
+                {loading ? (
+                  <tr><td colSpan={9} className="text-center py-8 text-gray-500">Loading payroll data...</td></tr>
+                ) : payrollData.length === 0 ? (
+                  <tr><td colSpan={9} className="text-center py-8 text-gray-500">No payroll created for this month yet. Use <span className="font-bold text-[#7AC143]">Calculate All</span> to generate.</td></tr>
+                ) : payrollData.map((emp) => (
                   <tr key={emp.id}>
                     <td>
                       <div className="flex items-center gap-3">
@@ -200,21 +227,20 @@ export const Payroll = () => {
                     </td>
                     <td className="font-extrabold text-gray-900">LKR {formatCurrency(emp.netSalary)}</td>
                     <td>
-                      <span className={`nintendo-badge ${
-                        emp.status === "Processed" ? "nintendo-badge-success" : "nintendo-badge-warning"
-                      }`}>
+                      <span className={`nintendo-badge ${emp.status === "Processed" ? "nintendo-badge-success" : "nintendo-badge-warning"
+                        }`}>
                         {emp.status}
                       </span>
                     </td>
                     <td>
                       <div className="flex gap-2">
-                        <button 
+                        <button
                           onClick={() => handleViewPayslip(emp)}
                           className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
                         >
                           <Eye className="w-4 h-4 text-gray-600" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handlePrintPayslip(emp)}
                           className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
                         >
@@ -300,7 +326,7 @@ export const Payroll = () => {
                 <h3 className="text-2xl font-bold text-gray-900">Hardware Pro Store</h3>
                 <p className="text-gray-500">Payslip for {selectedMonth}</p>
               </div>
-              
+
               <div className="flex justify-between items-start">
                 <div>
                   <p className="font-bold text-gray-900">{selectedEmployee.name}</p>
