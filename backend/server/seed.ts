@@ -8,6 +8,7 @@ async function seed() {
     await db.insert(users).values([
       { username: "admin", password: "admin123", name: "Admin User", role: "admin" },
       { username: "cashier", password: "cashier123", name: "Priya Sharma", role: "cashier" },
+      { username: "inventory", password: "inv123", name: "Robert Fernando", role: "inventory_manager" },
     ]);
     console.log("Seeded users: admin, cashier");
   } else {

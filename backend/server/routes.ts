@@ -62,6 +62,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // System routes
   app.get("/api/system/status", systemController.getStatus);
 
+  // ML Recommendations route
+  app.post("/api/recommendations", async (req, res) => {
+    try {
+      const response = await fetch('http://localhost:5001/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(req.body)
+      });
+
+      if (!response.ok) {
+        throw new Error(`ML Service responded with ${response.status}`);
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error("ML Recommendation Error:", error);
+      res.status(500).json({ error: "Failed to fetch recommendations from ML service" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

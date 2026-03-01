@@ -1,10 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  Package, 
-  DollarSign, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Package,
+  DollarSign,
+  BarChart3,
   Settings,
   LogOut,
   Wrench,
@@ -15,17 +15,17 @@ import {
 import { useAuth } from "../context/AuthContext";
 
 const mainNavItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: ShoppingCart, label: "POS", path: "/pos" },
-  { icon: Package, label: "Inventory", path: "/products" },
-  { icon: CreditCard, label: "Sales", path: "/sales" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/", roles: ["admin", "inventory_manager"] },
+  { icon: ShoppingCart, label: "POS", path: "/pos", roles: ["admin", "cashier"] },
+  { icon: Package, label: "Inventory", path: "/products", roles: ["admin", "inventory_manager"] },
+  { icon: CreditCard, label: "Sales", path: "/sales", roles: ["admin", "cashier"] },
 ];
 
 const managementNavItems = [
-  { icon: Wallet, label: "Finance", path: "/finance" },
-  { icon: Users, label: "Employees", path: "/employees" },
-  { icon: DollarSign, label: "Payroll", path: "/payroll" },
-  { icon: BarChart3, label: "Analytics", path: "/reports" },
+  { icon: Wallet, label: "Finance", path: "/finance", roles: ["admin"] },
+  { icon: Users, label: "Employees", path: "/employees", roles: ["admin"] },
+  { icon: DollarSign, label: "Payroll", path: "/payroll", roles: ["admin"] },
+  { icon: BarChart3, label: "Analytics", path: "/reports", roles: ["admin"] },
 ];
 
 export const Sidebar = () => {
@@ -40,7 +40,7 @@ export const Sidebar = () => {
   const NavItem = ({ item }) => {
     const isActive = location === item.path;
     const Icon = item.icon;
-    
+
     return (
       <Link href={item.path}>
         <button
@@ -68,25 +68,33 @@ export const Sidebar = () => {
       <nav className="flex-1 p-4 overflow-y-auto">
         <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3 px-4">Main Menu</p>
         <div className="flex flex-col gap-1 mb-6">
-          {mainNavItems.map((item) => (
+          {mainNavItems.filter(i => i.roles.includes(user?.role)).map((item) => (
             <NavItem key={item.path} item={item} />
           ))}
         </div>
 
-        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3 px-4">Management</p>
-        <div className="flex flex-col gap-1 mb-6">
-          {managementNavItems.map((item) => (
-            <NavItem key={item.path} item={item} />
-          ))}
-        </div>
+        {managementNavItems.filter(i => i.roles.includes(user?.role)).length > 0 && (
+          <>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3 px-4">Management</p>
+            <div className="flex flex-col gap-1 mb-6">
+              {managementNavItems.filter(i => i.roles.includes(user?.role)).map((item) => (
+                <NavItem key={item.path} item={item} />
+              ))}
+            </div>
+          </>
+        )}
 
-        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3 px-4">System</p>
-        <Link href="/settings">
-          <button className={`nintendo-nav-item w-full ${location === '/settings' ? 'active' : ''}`}>
-            <Settings className="w-5 h-5" />
-            <span>Settings</span>
-          </button>
-        </Link>
+        {user?.role === "admin" && (
+          <>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3 px-4">System</p>
+            <Link href="/settings">
+              <button className={`nintendo-nav-item w-full ${location === '/settings' ? 'active' : ''}`}>
+                <Settings className="w-5 h-5" />
+                <span>Settings</span>
+              </button>
+            </Link>
+          </>
+        )}
       </nav>
 
       <div className="p-4 border-t border-white/10">

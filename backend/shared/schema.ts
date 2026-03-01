@@ -7,6 +7,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
 // Sync Queue for Offline
 export const syncQueue = sqliteTable("sync_queue", {
@@ -20,7 +21,7 @@ export const syncQueue = sqliteTable("sync_queue", {
 
 // Users (auth + staff)
 export const users = sqliteTable("users", {
-  id: text("id").primaryKey(), // using text since SQLite UUIDs are text
+  id: text("id").primaryKey().$defaultFn(() => randomUUID()), // using text since SQLite UUIDs are text
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name"),

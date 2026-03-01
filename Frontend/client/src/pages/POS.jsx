@@ -23,6 +23,7 @@ export const POS = () => {
   const [cashReceived, setCashReceived] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [recommendations, setRecommendations] = useState([]);
   const toast = useToast();
 
   const categories = ["All", "Tools", "Hardware", "Painting", "Adhesives", "Materials"];
@@ -42,11 +43,44 @@ export const POS = () => {
     load();
   }, []);
 
+  // Fetch ML recommendations whenever the cart changes
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (cart.length === 0) {
+        setRecommendations([]);
+        return;
+      }
+      try {
+        const itemNames = cart.map(item => item.name);
+        const res = await fetch("/api/recommendations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items: itemNames })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Map predicted names back to actual product objects from the store inventory
+          const recommendedProducts = data.recommendations
+            .map(recName => products.find(p => p.name.toUpperCase() === recName.toUpperCase()))
+            .filter(Boolean);
+          setRecommendations(recommendedProducts);
+        }
+      } catch (err) {
+        console.error("Failed to fetch recommendations:", err);
+      }
+    };
+
+    // Only fetch if products are loaded
+    if (products.length > 0) {
+      fetchRecommendations();
+    }
+  }, [cart, products]);
+
   const addToCart = (product) => {
     const existing = cart.find(item => item.id === product.id);
     if (existing) {
-      setCart(cart.map(item => 
-        item.id === product.id 
+      setCart(cart.map(item =>
+        item.id === product.id
           ? { ...item, quantity: item.quantity + 1 }
           : item
       ));
@@ -91,7 +125,7 @@ export const POS = () => {
       toast.error("Cart is empty!");
       return;
     }
-    
+
     if (paymentMethod === "cash" && parseFloat(cashReceived) < total) {
       toast.error("Insufficient cash received!");
       return;
@@ -147,7 +181,7 @@ export const POS = () => {
       <Sidebar />
       <main className="flex-1">
         <Navbar title="Point of Sale" />
-        
+
         <div className="p-6 space-y-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -204,17 +238,16 @@ export const POS = () => {
                     />
                   </div>
                 </div>
-                
+
                 <div className="flex gap-2 flex-wrap">
                   {categories.map(cat => (
                     <button
                       key={cat}
                       onClick={() => setSelectedCategory(cat)}
-                      className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                        selectedCategory === cat
+                      className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedCategory === cat
                           ? "bg-[#E60012] text-white shadow-lg"
                           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      }`}
+                        }`}
                     >
                       {cat}
                     </button>
@@ -226,20 +259,20 @@ export const POS = () => {
                 {productsLoading ? (
                   <div className="col-span-3 p-8 text-center text-gray-500">Loading products...</div>
                 ) : (
-                filteredProducts.map(product => (
-                  <div 
-                    key={product.id}
-                    onClick={() => addToCart(product)}
-                    className="nintendo-card p-4 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-200"
-                  >
-                    <div className="h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl mb-3 flex items-center justify-center">
-                      <span className="text-3xl">🔧</span>
+                  filteredProducts.map(product => (
+                    <div
+                      key={product.id}
+                      onClick={() => addToCart(product)}
+                      className="nintendo-card p-4 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-200"
+                    >
+                      <div className="h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl mb-3 flex items-center justify-center">
+                        <span className="text-3xl">🔧</span>
+                      </div>
+                      <p className="font-bold text-gray-900 mb-1">{product.name}</p>
+                      <p className="text-xs text-gray-500 mb-2">{product.category}</p>
+                      <p className="text-lg font-extrabold text-[#E60012]">LKR {product.price?.toFixed(2)}</p>
                     </div>
-                    <p className="font-bold text-gray-900 mb-1">{product.name}</p>
-                    <p className="text-xs text-gray-500 mb-2">{product.category}</p>
-                    <p className="text-lg font-extrabold text-[#E60012]">LKR {product.price?.toFixed(2)}</p>
-                  </div>
-                ))
+                  ))
                 )}
               </div>
             </div>
@@ -250,7 +283,7 @@ export const POS = () => {
                   <h3 className="font-bold text-xl text-gray-900">Cart</h3>
                   <span className="nintendo-badge nintendo-badge-info">{cart.length} items</span>
                 </div>
-                
+
                 <div className="space-y-3 mb-4 max-h-80 overflow-auto">
                   {cart.length === 0 ? (
                     <div className="text-center py-12">
@@ -271,21 +304,21 @@ export const POS = () => {
                           <p className="text-sm text-[#E60012] font-semibold">${item.price.toFixed(2)}</p>
                         </div>
                         <div className="flex items-center gap-1">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }} 
+                          <button
+                            onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, -1); }}
                             className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-300 transition-colors"
                           >
                             <Minus className="w-4 h-4" />
                           </button>
                           <span className="w-10 text-center font-bold">{item.quantity}</span>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }} 
+                          <button
+                            onClick={(e) => { e.stopPropagation(); updateQuantity(item.id, 1); }}
                             className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-300 transition-colors"
                           >
                             <Plus className="w-4 h-4" />
                           </button>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); removeItem(item.id); }} 
+                          <button
+                            onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
                             className="w-8 h-8 bg-[#E60012]/10 text-[#E60012] rounded-lg flex items-center justify-center hover:bg-[#E60012]/20 transition-colors ml-1"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -312,21 +345,21 @@ export const POS = () => {
                 </div>
 
                 <div className="mt-5 grid grid-cols-3 gap-2">
-                  <button 
+                  <button
                     onClick={() => handlePayment("cash")}
                     className="flex flex-col items-center gap-1 p-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
                   >
                     <Banknote className="w-5 h-5 text-[#7AC143]" />
                     <span className="text-xs font-bold text-gray-700">Cash</span>
                   </button>
-                  <button 
+                  <button
                     onClick={() => handlePayment("card")}
                     className="flex flex-col items-center gap-1 p-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
                   >
                     <CreditCard className="w-5 h-5 text-[#0AB5CD]" />
                     <span className="text-xs font-bold text-gray-700">Card</span>
                   </button>
-                  <button 
+                  <button
                     onClick={() => handlePayment("mobile")}
                     className="flex flex-col items-center gap-1 p-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
                   >
@@ -340,6 +373,36 @@ export const POS = () => {
                   Generate Receipt
                 </Button>
               </div>
+
+              {/* ML Recommendations Section */}
+              {recommendations.length > 0 && (
+                <div className="nintendo-card p-5 mt-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-xl">✨</span>
+                    <h3 className="font-bold text-lg text-gray-900">Suggested Add-ons</h3>
+                  </div>
+                  <div className="space-y-3">
+                    {recommendations.map(product => (
+                      <div
+                        key={`rec-${product.id}`}
+                        onClick={() => addToCart(product)}
+                        className="flex items-center gap-3 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl cursor-pointer hover:shadow-md transition-all border border-yellow-100"
+                      >
+                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-sm shadow-sm">
+                          🎯
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-bold text-sm text-gray-900">{product.name}</p>
+                          <p className="text-xs text-[#E60012] font-semibold">${product.price.toFixed(2)}</p>
+                        </div>
+                        <button className="w-8 h-8 bg-white text-[#E60012] rounded-lg flex items-center justify-center shadow-sm hover:scale-110 transition-transform">
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -357,11 +420,10 @@ export const POS = () => {
                   <button
                     key={method.id}
                     onClick={() => setPaymentMethod(method.id)}
-                    className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                      paymentMethod === method.id 
-                        ? "border-[#E60012] bg-[#E60012]/5" 
+                    className={`flex-1 flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${paymentMethod === method.id
+                        ? "border-[#E60012] bg-[#E60012]/5"
                         : "border-gray-100 bg-gray-50"
-                    }`}
+                      }`}
                   >
                     <Icon className={`w-6 h-6 ${method.color}`} />
                     <span className="font-bold text-gray-900">{method.label}</span>

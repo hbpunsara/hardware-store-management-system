@@ -10,8 +10,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5000
-      # Optional: set DATABASE_URL if using Postgres (e.g. from docker-compose.pg.yml)
-      # - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/hardware_db
+      # This reads the Supabase DATABASE_URL from your .env file
+      - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      - app-data:/app/backend
 
   frontend:
     build:
@@ -22,12 +24,25 @@ services:
     depends_on:
       - backend
 
-  # Optional: Electron app (existing)
-  # electron-app:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/Dockerfile
-  #   environment:
-  #     - DISPLAY=:0
-  #   volumes:
-  #     - /tmp/.X11-unix:/tmp/.X11-unix
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: ../docker/ml-service/Dockerfile
+    ports:
+      - "5001:5001"
+    volumes:
+      - app-data:/app/backend
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+
+volumes:
+  app-data:
+    # Optional: Electron app (existing)
+    # electron-app:
+    #   build:
+    #     context: .
+    #     dockerfile: docker/Dockerfile
+    #   environment:
+    #     - DISPLAY=:0
+    #   volumes:
+    #     - /tmp/.X11-unix:/tmp/.X11-unix
