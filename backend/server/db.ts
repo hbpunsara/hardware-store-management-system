@@ -16,7 +16,10 @@ export const getRemoteDb = () => {
   if (remoteDbInstance) return remoteDbInstance;
 
   if (process.env.DATABASE_URL) {
-    const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+    const pool = new pg.Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    });
     remoteDbInstance = drizzlePg(pool, { schema });
     return remoteDbInstance;
   }
