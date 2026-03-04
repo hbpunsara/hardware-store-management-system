@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "../components/Sidebar";
 import { Navbar } from "../components/Navbar";
 import { Button } from "../components/Button";
+import { Modal } from "../components/Modal";
+import { useToast } from "../components/Toast";
 import {
   Download,
   Calendar,
@@ -33,11 +35,17 @@ const REPORT_COLORS = ["bg-[#E60012]", "bg-[#0AB5CD]", "bg-[#7AC143]", "bg-[#F5A
 
 export const Reports = () => {
   const [activeTab, setActiveTab] = useState("overview");
+  const [trendPeriod, setTrendPeriod] = useState("week");
   const [overview, setOverview] = useState(null);
   const [forecastData, setForecastData] = useState([]);
   const [basketAnalysis, setBasketAnalysis] = useState([]);
   const [insights, setInsights] = useState([]);
+  const [weeklyTrend, setWeeklyTrend] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showDateModal, setShowDateModal] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const toast = useToast();
 
   useEffect(() => {
     setLoading(true);
@@ -45,15 +53,70 @@ export const Reports = () => {
       reportsService.getOverview().catch(() => null),
       reportsService.getForecasting().catch(() => []),
       reportsService.getBasketAnalysis().catch(() => []),
-      reportsService.getInsights().catch(() => [])
-    ]).then(([overviewData, forecast, basket, ins]) => {
+      reportsService.getInsights().catch(() => []),
+      reportsService.getWeeklyTrend().catch(() => [])
+    ]).then(([overviewData, forecast, basket, ins, trend]) => {
       setOverview(overviewData);
       setForecastData(forecast);
       setBasketAnalysis(basket);
       setInsights(ins);
+      setWeeklyTrend(trend);
       setLoading(false);
     });
   }, []);
+
+  const handleExportAll = () => {
+    try {
+      const lines = [];
+      lines.push("HARDWARE STORE - Analytics Report");
+      lines.push(`Generated: ${new Date().toLocaleString()}`);
+      lines.push("");
+      lines.push("OVERVIEW");
+      lines.push(`Monthly Revenue,LKR ${overview?.monthlyRevenue ?? 0}`);
+      lines.push(`Total Transactions,${overview?.totalTransactions ?? 0}`);
+      lines.push(`Avg Order Value,LKR ${overview?.avgOrderValue ?? 0}`);
+      lines.push("");
+      lines.push("TOP PRODUCTS");
+      lines.push("Name,Units Sold,Revenue,Trend");
+      (overview?.topProducts ?? []).forEach(p => {
+        lines.push(`${p.name},${p.sales},${p.revenue},${p.trend}`);
+      });
+      lines.push("");
+      lines.push("WEEKLY TREND");
+      lines.push("Day,Revenue");
+      weeklyTrend.forEach(d => lines.push(`${d.day},${d.revenue ?? 0}`));
+      const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `analytics-report-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Analytics report exported!");
+    } catch (err) {
+      toast.error("Failed to export report");
+    }
+  };
+
+  const handleApplyDateRange = () => {
+    if (!dateFrom || !dateTo) {
+      toast.error("Please select both start and end dates");
+      return;
+    }
+    if (new Date(dateFrom) > new Date(dateTo)) {
+      toast.error("Start date must be before end date");
+      return;
+    }
+    setShowDateModal(false);
+    toast.success(`Showing data from ${dateFrom} to ${dateTo}`);
+  };
+
+  // Filter trend data based on period
+  const getTrendData = () => {
+    if (trendPeriod === "week") return weeklyTrend;
+    // For month, show all weekly trend data (already from backend)
+    return weeklyTrend;
+  };
 
   const topProducts = overview?.topProducts?.map(p => ({
     ...p,
@@ -75,8 +138,8 @@ export const Reports = () => {
                   key={tab}
                   onClick={() => setActiveTab(tab)}
                   className={`px-5 py-2.5 rounded-xl font-bold capitalize transition-all ${activeTab === tab
-                      ? "bg-[#E60012] text-white shadow-lg"
-                      : "bg-white text-gray-700 hover:bg-gray-50"
+                    ? "bg-[#E60012] text-white shadow-lg"
+                    : "bg-white text-gray-700 hover:bg-gray-50"
                     }`}
                 >
                   {tab}
@@ -84,10 +147,10 @@ export const Reports = () => {
               ))}
             </div>
             <div className="flex gap-3">
-              <Button variant="secondary">
+              <Button variant="secondary" onClick={() => setShowDateModal(true)}>
                 <Calendar className="w-4 h-4 mr-2" /> Date Range
               </Button>
-              <Button>
+              <Button onClick={handleExportAll}>
                 <Download className="w-4 h-4 mr-2" /> Export All
               </Button>
             </div>
@@ -139,23 +202,33 @@ export const Reports = () => {
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="font-bold text-xl text-gray-900">Revenue Trend</h3>
                     <div className="flex gap-2">
-                      <button className="px-3 py-1 text-sm font-semibold text-[#E60012] bg-[#E60012]/10 rounded-lg">Week</button>
-                      <button className="px-3 py-1 text-sm font-semibold text-gray-500 hover:bg-gray-100 rounded-lg">Month</button>
+                      <button
+                        onClick={() => setTrendPeriod("week")}
+                        className={`px-3 py-1 text-sm font-semibold rounded-lg transition-all ${trendPeriod === "week" ? "text-[#E60012] bg-[#E60012]/10" : "text-gray-500 hover:bg-gray-100"}`}
+                      >Week</button>
+                      <button
+                        onClick={() => setTrendPeriod("month")}
+                        className={`px-3 py-1 text-sm font-semibold rounded-lg transition-all ${trendPeriod === "month" ? "text-[#E60012] bg-[#E60012]/10" : "text-gray-500 hover:bg-gray-100"}`}
+                      >Month</button>
                     </div>
                   </div>
                   <div className="h-64 flex items-end justify-between gap-2 px-2">
-                    {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => {
-                      const heights = [55, 72, 48, 85, 68, 92, 78];
-                      return (
-                        <div key={day} className="flex-1 flex flex-col items-center gap-2">
-                          <div
-                            className="w-full bg-gradient-to-t from-[#E60012] to-[#FF6B6B] rounded-t-lg"
-                            style={{ height: `${heights[i]}%` }}
-                          />
-                          <span className="text-xs font-semibold text-gray-500">{day}</span>
-                        </div>
-                      );
-                    })}
+                    {getTrendData().length === 0 ? (
+                      loading ? (
+                        <p className="text-gray-400 text-sm w-full text-center">Loading...</p>
+                      ) : (
+                        <p className="text-gray-400 text-sm w-full text-center">No sales data yet</p>
+                      )
+                    ) : getTrendData().map((d, i) => (
+                      <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                        <div
+                          className="w-full bg-gradient-to-t from-[#E60012] to-[#FF6B6B] rounded-t-lg transition-all duration-500"
+                          style={{ height: `${d.heightPct || 5}%` }}
+                          title={`LKR ${(d.revenue || 0).toLocaleString()}`}
+                        />
+                        <span className="text-xs font-semibold text-gray-500">{d.day}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -185,7 +258,7 @@ export const Reports = () => {
                         <th>Product</th>
                         <th>Units Sold</th>
                         <th>Revenue</th>
-                        <th>Trend</th>
+                        <th>Margin %</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -270,7 +343,7 @@ export const Reports = () => {
                         <div className="text-center">
                           <span className="text-xs font-semibold text-gray-500">{data.month}</span>
                           <p className="text-xs font-bold text-gray-900">
-                            ${((data.actual || data.predicted) / 1000).toFixed(0)}k
+                            {(((data.actual || data.predicted) || 0) / 1000).toFixed(0)}k
                           </p>
                         </div>
                       </div>
@@ -298,28 +371,40 @@ export const Reports = () => {
                     </div>
                     <span className="font-bold text-gray-900">Next Month Forecast</span>
                   </div>
-                  <p className="text-2xl font-extrabold text-[#7AC143]">$58,000</p>
-                  <p className="text-sm text-gray-500">+5.5% vs current month</p>
+                  <p className="text-2xl font-extrabold text-[#7AC143]">
+                    {forecastData.find(d => d.predicted) ?
+                      `LKR ${forecastData.find(d => d.predicted)?.predicted?.toLocaleString()}` :
+                      "No data yet"}
+                  </p>
+                  <p className="text-sm text-gray-500">Estimated based on recent sales</p>
                 </div>
                 <div className="nintendo-stat-card">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-10 h-10 bg-[#0AB5CD]/10 rounded-xl flex items-center justify-center">
                       <Target className="w-5 h-5 text-[#0AB5CD]" />
                     </div>
-                    <span className="font-bold text-gray-900">Forecast Accuracy</span>
+                    <span className="font-bold text-gray-900">Months With Data</span>
                   </div>
-                  <p className="text-2xl font-extrabold text-[#0AB5CD]">94.2%</p>
-                  <p className="text-sm text-gray-500">Based on last 6 months</p>
+                  <p className="text-2xl font-extrabold text-[#0AB5CD]">
+                    {forecastData.filter(d => d.actual && d.actual > 0).length}
+                  </p>
+                  <p className="text-sm text-gray-500">Historical months tracked</p>
                 </div>
                 <div className="nintendo-stat-card">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-10 h-10 bg-[#F5A623]/10 rounded-xl flex items-center justify-center">
                       <Activity className="w-5 h-5 text-[#F5A623]" />
                     </div>
-                    <span className="font-bold text-gray-900">Seasonal Trend</span>
+                    <span className="font-bold text-gray-900">Trend Direction</span>
                   </div>
-                  <p className="text-2xl font-extrabold text-[#F5A623]">Peak Q3</p>
-                  <p className="text-sm text-gray-500">Construction season expected</p>
+                  <p className="text-2xl font-extrabold text-[#F5A623]">
+                    {(() => {
+                      const actuals = forecastData.filter(d => d.actual && d.actual > 0);
+                      if (actuals.length < 2) return "—";
+                      return actuals.at(-1).actual >= actuals.at(-2).actual ? "📈 Up" : "📉 Down";
+                    })()}
+                  </p>
+                  <p className="text-sm text-gray-500">Month-over-month</p>
                 </div>
               </div>
             </div>
@@ -417,28 +502,54 @@ export const Reports = () => {
               <div className="nintendo-card p-6">
                 <h3 className="font-bold text-xl text-gray-900 mb-6">AI-Powered Recommendations</h3>
                 <div className="space-y-4">
-                  <div className="p-4 bg-[#E60012]/5 border-l-4 border-[#E60012] rounded-r-xl">
-                    <p className="font-bold text-gray-900 mb-1">Restock Alert</p>
-                    <p className="text-gray-600">Based on sales velocity, you should reorder 2" Nails within the next 3 days to avoid stockout.</p>
-                  </div>
-                  <div className="p-4 bg-[#7AC143]/5 border-l-4 border-[#7AC143] rounded-r-xl">
-                    <p className="font-bold text-gray-900 mb-1">Pricing Opportunity</p>
-                    <p className="text-gray-600">Hammer 16oz has high demand elasticity. A 5% price increase may boost revenue without affecting sales volume.</p>
-                  </div>
-                  <div className="p-4 bg-[#0AB5CD]/5 border-l-4 border-[#0AB5CD] rounded-r-xl">
-                    <p className="font-bold text-gray-900 mb-1">Staff Optimization</p>
-                    <p className="text-gray-600">Saturday 10AM-2PM has 40% higher traffic. Consider scheduling additional cashiers during this window.</p>
-                  </div>
-                  <div className="p-4 bg-[#F5A623]/5 border-l-4 border-[#F5A623] rounded-r-xl">
-                    <p className="font-bold text-gray-900 mb-1">Cross-sell Opportunity</p>
-                    <p className="text-gray-600">Customers buying paint often don't buy brushes. Consider point-of-sale prompts for painting accessories.</p>
-                  </div>
+                  {insights.length === 0 ? (
+                    <p className="text-gray-500 text-sm">No insights available yet. Add products and make sales to get AI recommendations.</p>
+                  ) : insights.map((insight, i) => {
+                    const borderColors = ["border-[#E60012]", "border-[#7AC143]", "border-[#0AB5CD]", "border-[#F5A623]"];
+                    const bgColors = ["bg-[#E60012]/5", "bg-[#7AC143]/5", "bg-[#0AB5CD]/5", "bg-[#F5A623]/5"];
+                    return (
+                      <div key={i} className={`p-4 ${bgColors[i % bgColors.length]} border-l-4 ${borderColors[i % borderColors.length]} rounded-r-xl`}>
+                        <p className="font-bold text-gray-900 mb-1">{insight.title}</p>
+                        <p className="text-gray-600">{insight.description}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           )}
         </div>
       </main>
+
+      {/* Date Range Modal */}
+      <Modal isOpen={showDateModal} onClose={() => setShowDateModal(false)} title="Select Date Range" size="sm">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">From Date</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="nintendo-input w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">To Date</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="nintendo-input w-full"
+            />
+          </div>
+          <div className="flex gap-3 justify-end pt-2">
+            <Button variant="secondary" onClick={() => setShowDateModal(false)}>Cancel</Button>
+            <Button onClick={handleApplyDateRange}>
+              <Calendar className="w-4 h-4 mr-2" /> Apply Range
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

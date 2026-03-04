@@ -23,10 +23,16 @@ function toUserRow(row: { id: string; username: string; name: string | null; rol
   };
 }
 
+const userStatusOverrides: Record<string, string> = {};
+
 export const usersController = {
   getAll: async (_req: Request, res: Response) => {
     const rows = await storage.getAllUsers();
-    res.json(rows.map((r) => toUserRow(r)));
+    res.json(rows.map((r) => {
+      const user = toUserRow(r);
+      user.status = userStatusOverrides[r.id] ?? "Active";
+      return user;
+    }));
   },
 
   create: async (req: Request, res: Response) => {
@@ -58,4 +64,19 @@ export const usersController = {
       res.status(500).json({ message: msg || "Failed to create user" });
     }
   },
+
+  updateStatus: async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      if (!status || !["Active", "Inactive"].includes(status)) {
+        return res.status(400).json({ message: "Status must be 'Active' or 'Inactive'" });
+      }
+      userStatusOverrides[id] = status;
+      res.json({ id, status, message: `User status updated to ${status}` });
+    } catch (err) {
+      res.status(500).json({ message: "Failed to update user status" });
+    }
+  },
 };
+

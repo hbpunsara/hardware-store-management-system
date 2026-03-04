@@ -8,13 +8,17 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 
 import { Dashboard } from "@/pages/Dashboard";
 import { POS } from "@/pages/POS";
-import { Products } from "@/pages/Products";
+import { Returns } from "@/pages/Returns";
+import { Inventory as Products } from "@/pages/Inventory";
 import { Sales } from "@/pages/Sales";
 import { Finance } from "@/pages/Finance";
 import { Employees } from "@/pages/Employees";
+import { Customers } from "@/pages/Customers";
+import { Quotes } from "@/pages/Quotes";
 import { Payroll } from "@/pages/Payroll";
-import { Reports } from "@/pages/Reports";
 import { Settings } from "@/pages/Settings";
+import { Promotions } from "@/pages/Promotions";
+import { Reports } from "@/pages/Reports";
 import { Login } from "@/pages/Login";
 
 const ProtectedComponent = ({ component: Component, allowedRoles, params }: any) => {
@@ -22,7 +26,7 @@ const ProtectedComponent = ({ component: Component, allowedRoles, params }: any)
 
   if (!isAuthenticated) return <Redirect to="/login" />;
 
-  const userRole = user?.role || "cashier";
+  const userRole = (user as any)?.role || "cashier";
   if (allowedRoles && !allowedRoles.includes(userRole)) {
     if (userRole === "cashier") return <Redirect to="/pos" />;
     if (userRole === "inventory_manager") return <Redirect to="/products" />;
@@ -45,12 +49,16 @@ function Router() {
     <Switch>
       <ProtectedRoute path="/" component={Dashboard} allowedRoles={["admin", "inventory_manager"]} />
       <ProtectedRoute path="/pos" component={POS} allowedRoles={["admin", "cashier"]} />
+      <ProtectedRoute path="/returns" component={Returns} allowedRoles={["admin", "cashier"]} />
       <ProtectedRoute path="/products" component={Products} allowedRoles={["admin", "inventory_manager"]} />
       <ProtectedRoute path="/sales" component={Sales} allowedRoles={["admin", "cashier"]} />
+      <ProtectedRoute path="/customers" component={Customers} allowedRoles={["admin", "cashier"]} />
+      <ProtectedRoute path="/quotes" component={Quotes} allowedRoles={["admin", "cashier"]} />
       <ProtectedRoute path="/finance" component={Finance} allowedRoles={["admin"]} />
       <ProtectedRoute path="/employees" component={Employees} allowedRoles={["admin"]} />
       <ProtectedRoute path="/payroll" component={Payroll} allowedRoles={["admin"]} />
       <ProtectedRoute path="/reports" component={Reports} allowedRoles={["admin"]} />
+      <ProtectedRoute path="/promotions" component={Promotions} allowedRoles={["admin"]} />
       <ProtectedRoute path="/settings" component={Settings} allowedRoles={["admin"]} />
       <Route path="/login" component={Login} />
       <Route>

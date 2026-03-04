@@ -18,13 +18,13 @@ async function seed() {
   const existingProducts = await db.select().from(products);
   if (existingProducts.length === 0) {
     await db.insert(products).values([
-      { sku: "HAM-16", name: "Hammer 16oz", category: "Tools", price: "12.99", stock: 24, supplier: "ForgeCo" },
-      { sku: "NAIL-2", name: 'Nails 2" (100pc)', category: "Hardware", price: "2.20", stock: 5, supplier: "SteelMart" },
-      { sku: "BRSH-2", name: 'Paint Brush 2"', category: "Painting", price: "3.99", stock: 80, supplier: "ColorSync" },
-      { sku: "DUCT-1", name: "Duct Tape", category: "Adhesives", price: "4.50", stock: 34, supplier: "Grip&Go" },
-      { sku: "SCRW-PH", name: "Philips Screwdriver", category: "Tools", price: "6.50", stock: 45, supplier: "ForgeCo" },
-      { sku: "TAPE-M", name: "Measuring Tape", category: "Tools", price: "7.25", stock: 30, supplier: "ForgeCo" },
-      { sku: "KNIFE-U", name: "Utility Knife", category: "Tools", price: "5.75", stock: 25, supplier: "ForgeCo" },
+      { sku: "HAM-16", name: "Hammer 16oz", category: "Tools", price: 12.99, stock: 24, supplier: "ForgeCo" },
+      { sku: "NAIL-2", name: 'Nails 2" (100pc)', category: "Hardware", price: 2.20, stock: 5, supplier: "SteelMart" },
+      { sku: "BRSH-2", name: 'Paint Brush 2"', category: "Painting", price: 3.99, stock: 80, supplier: "ColorSync" },
+      { sku: "DUCT-1", name: "Duct Tape", category: "Adhesives", price: 4.50, stock: 34, supplier: "Grip&Go" },
+      { sku: "SCRW-PH", name: "Philips Screwdriver", category: "Tools", price: 6.50, stock: 45, supplier: "ForgeCo" },
+      { sku: "TAPE-M", name: "Measuring Tape", category: "Tools", price: 7.25, stock: 30, supplier: "ForgeCo" },
+      { sku: "KNIFE-U", name: "Utility Knife", category: "Tools", price: 5.75, stock: 25, supplier: "ForgeCo" },
     ]);
     console.log("Seeded 7 products");
   } else {

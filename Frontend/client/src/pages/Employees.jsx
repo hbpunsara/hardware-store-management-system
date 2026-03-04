@@ -4,10 +4,10 @@ import { Navbar } from "../components/Navbar";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { useToast } from "../components/Toast";
-import { 
-  UserPlus, 
-  Calendar, 
-  CheckCircle, 
+import {
+  UserPlus,
+  Calendar,
+  CheckCircle,
   XCircle,
   Search,
   Filter,
@@ -88,8 +88,8 @@ export const Employees = () => {
       toast.error("Please enter an employee ID or name");
       return;
     }
-    const emp = employees.find(e => 
-      String(e.id) === quickCheckId || 
+    const emp = employees.find(e =>
+      String(e.id) === quickCheckId ||
       e.name.toLowerCase().includes(quickCheckId.toLowerCase())
     );
     if (!emp) {
@@ -128,15 +128,20 @@ export const Employees = () => {
     { label: "Present Today", value: employees.filter(e => e.status === "Present").length.toString(), total: employees.length.toString(), icon: CheckCircle, color: "bg-[#7AC143]" },
     { label: "Absent", value: employees.filter(e => e.status === "Absent").length.toString(), total: employees.length.toString(), icon: XCircle, color: "bg-[#E60012]" },
     { label: "On Leave", value: employees.filter(e => e.status === "On Leave").length.toString(), total: employees.length.toString(), icon: Calendar, color: "bg-[#F5A623]" },
-    { label: "Late Arrivals", value: "1", total: employees.filter(e => e.status === "Present").length.toString(), icon: Timer, color: "bg-[#0AB5CD]" },
+    { label: "Late Arrivals", value: employees.filter(e => e.status === "Present" && e.checkIn && e.checkIn > "09:00").length.toString(), total: employees.filter(e => e.status === "Present").length.toString(), icon: Timer, color: "bg-[#0AB5CD]" },
   ];
+
+  const presentCount = employees.filter(e => e.status === "Present").length;
+  const attendanceRate = employees.length > 0 ? Math.round((presentCount / employees.length) * 100) : 0;
+  const checkedInEmployees = employees.filter(e => e.checkIn && e.checkIn !== "-");
+  const avgCheckIn = checkedInEmployees.length > 0 ? checkedInEmployees[0].checkIn : "—";
 
   const recentActivity = employees
     .filter(e => e.status === "Present" && e.checkIn && e.checkIn !== "-")
     .map(e => ({ name: e.name, action: e.checkOut && e.checkOut !== "-" ? "Checked Out" : "Checked In", time: e.checkIn, type: e.checkOut && e.checkOut !== "-" ? "out" : "in" }))
     .slice(0, 5);
 
-  const filteredEmployees = employees.filter(e => 
+  const filteredEmployees = employees.filter(e =>
     e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     e.role.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -146,37 +151,50 @@ export const Employees = () => {
       <Sidebar />
       <main className="flex-1">
         <Navbar title="Employee Attendance" />
-        
+
         <div className="p-6 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex gap-3">
               <button
                 onClick={() => setView("attendance")}
-                className={`px-5 py-2.5 rounded-xl font-bold transition-all ${
-                  view === "attendance" ? "bg-[#E60012] text-white shadow-lg" : "bg-white text-gray-700"
-                }`}
+                className={`px-5 py-2.5 rounded-xl font-bold transition-all ${view === "attendance" ? "bg-[#E60012] text-white shadow-lg" : "bg-white text-gray-700"
+                  }`}
               >
                 Today's Attendance
               </button>
               <button
                 onClick={() => setView("employees")}
-                className={`px-5 py-2.5 rounded-xl font-bold transition-all ${
-                  view === "employees" ? "bg-[#E60012] text-white shadow-lg" : "bg-white text-gray-700"
-                }`}
+                className={`px-5 py-2.5 rounded-xl font-bold transition-all ${view === "employees" ? "bg-[#E60012] text-white shadow-lg" : "bg-white text-gray-700"
+                  }`}
               >
                 All Employees
               </button>
               <button
                 onClick={() => setView("history")}
-                className={`px-5 py-2.5 rounded-xl font-bold transition-all ${
-                  view === "history" ? "bg-[#E60012] text-white shadow-lg" : "bg-white text-gray-700"
-                }`}
+                className={`px-5 py-2.5 rounded-xl font-bold transition-all ${view === "history" ? "bg-[#E60012] text-white shadow-lg" : "bg-white text-gray-700"
+                  }`}
               >
                 Attendance History
               </button>
             </div>
             <div className="flex gap-3">
-              <Button variant="secondary" onClick={() => toast.success("Exporting attendance report...")}>
+              <Button variant="secondary" onClick={() => {
+                try {
+                  const headers = ["ID", "Name", "Role", "Department", "Status", "Check In", "Check Out", "Hours"];
+                  const rows = employees.map(e => [e.id, e.name, e.role, e.department, e.status, e.checkIn || "-", e.checkOut || "-", e.hours || "-"]);
+                  const csvContent = [headers, ...rows].map(r => r.join(",")).join("\n");
+                  const blob = new Blob([csvContent], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `attendance-${new Date().toISOString().split("T")[0]}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success("Attendance report exported!");
+                } catch (err) {
+                  toast.error("Failed to export");
+                }
+              }}>
                 <Download className="w-4 h-4 mr-2" /> Export
               </Button>
               <Button onClick={() => setShowAddModal(true)}>
@@ -256,11 +274,10 @@ export const Employees = () => {
                         </td>
                         <td className="text-gray-600">{emp.role}</td>
                         <td>
-                          <span className={`nintendo-badge ${
-                            emp.status === "Present" ? "nintendo-badge-success" :
+                          <span className={`nintendo-badge ${emp.status === "Present" ? "nintendo-badge-success" :
                             emp.status === "Absent" ? "nintendo-badge-danger" :
-                            "nintendo-badge-warning"
-                          }`}>
+                              "nintendo-badge-warning"
+                            }`}>
                             {emp.status}
                           </span>
                         </td>
@@ -317,9 +334,8 @@ export const Employees = () => {
                 <div className="space-y-3">
                   {recentActivity.map((activity, i) => (
                     <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                        activity.type === "in" ? "bg-[#7AC143]/10" : "bg-[#E60012]/10"
-                      }`}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${activity.type === "in" ? "bg-[#7AC143]/10" : "bg-[#E60012]/10"
+                        }`}>
                         {activity.type === "in" ? (
                           <LogIn className="w-5 h-5 text-[#7AC143]" />
                         ) : (
@@ -338,21 +354,21 @@ export const Employees = () => {
 
               <div className="nintendo-card p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-bold text-xl text-gray-900">This Week</h3>
+                  <h3 className="font-bold text-xl text-gray-900">Today's Summary</h3>
                   <TrendingUp className="w-5 h-5 text-[#7AC143]" />
                 </div>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Avg. Check-in Time</span>
-                    <span className="font-bold text-gray-900">8:42 AM</span>
+                    <span className="text-gray-600">First Check-in</span>
+                    <span className="font-bold text-gray-900">{avgCheckIn}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Avg. Hours/Day</span>
-                    <span className="font-bold text-gray-900">8.2 hrs</span>
+                    <span className="text-gray-600">Currently Present</span>
+                    <span className="font-bold text-gray-900">{presentCount} / {employees.length}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-gray-600">Attendance Rate</span>
-                    <span className="font-bold text-[#7AC143]">94.5%</span>
+                    <span className={`font-bold ${attendanceRate >= 80 ? "text-[#7AC143]" : "text-[#E60012]"}`}>{attendanceRate}%</span>
                   </div>
                 </div>
               </div>
@@ -367,7 +383,7 @@ export const Employees = () => {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="e.g., John Perera"
                 className="nintendo-input"
               />
@@ -376,7 +392,7 @@ export const Employees = () => {
               <label className="block text-sm font-bold text-gray-700 mb-2">Role</label>
               <select
                 value={formData.role}
-                onChange={(e) => setFormData({...formData, role: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 className="nintendo-input"
               >
                 {roles.map(role => (
@@ -388,7 +404,7 @@ export const Employees = () => {
               <label className="block text-sm font-bold text-gray-700 mb-2">Department</label>
               <select
                 value={formData.department}
-                onChange={(e) => setFormData({...formData, department: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                 className="nintendo-input"
               >
                 {departments.map(dept => (

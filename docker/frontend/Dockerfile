@@ -4,7 +4,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY Frontend/package.json Frontend/package-lock.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 COPY Frontend/ ./
 RUN npm run build

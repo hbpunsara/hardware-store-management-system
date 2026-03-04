@@ -54,11 +54,11 @@ export const payrollController = {
                 await storage.createPayroll({
                     employeeId: emp.id,
                     month: month,
-                    baseSalary: String(baseSalary),
-                    overtime: String(overtime),
-                    allowances: String(allowances),
-                    deductions: String(deductions),
-                    netSalary: String(netSalary),
+                    baseSalary: baseSalary,
+                    overtime: overtime,
+                    allowances: allowances,
+                    deductions: deductions,
+                    netSalary: netSalary,
                     daysWorked: 20,
                     status: "Pending",
                 });

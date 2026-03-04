@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { storage } from "../storage";
 
-function toTransactionRow(row: { id: number; date: string; description: string; category: string; type: string; amount: string; method: string }) {
+function toTransactionRow(row: { id: number; date: string; description: string; category: string; type: string; amount: number | string; method: string; customerId: number | null }) {
   return {
     id: row.id,
     date: row.date,
@@ -10,6 +10,7 @@ function toTransactionRow(row: { id: number; date: string; description: string; 
     type: row.type,
     amount: Number(row.amount),
     method: row.method,
+    customerId: row.customerId,
   };
 }
 
@@ -29,7 +30,7 @@ export const transactionsController = {
       description: String(description),
       category: String(category),
       type: String(type),
-      amount: String(amount),
+      amount: Number(amount),
       method: String(method),
     });
     res.status(201).json(toTransactionRow(row));

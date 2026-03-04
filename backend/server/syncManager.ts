@@ -1,5 +1,6 @@
 import { db, getRemoteDb } from "./db";
-import { syncQueue, products, sales, employees, transactions } from "../shared/schema";
+import { syncQueue } from "../shared/schema";
+import * as pg from "../shared/schema.pg";
 import { eq, asc } from "drizzle-orm";
 
 let isSyncing = false;
@@ -27,22 +28,22 @@ export async function processSyncQueue() {
 
                 switch (item.tableName) {
                     case 'products':
-                        if (item.operation === 'INSERT') await remoteDb.insert(products).values(payload).onConflictDoNothing();
-                        else if (item.operation === 'UPDATE') await remoteDb.update(products).set(payload).where(eq(products.id, Number(item.recordId)));
-                        else if (item.operation === 'DELETE') await remoteDb.delete(products).where(eq(products.id, Number(item.recordId)));
+                        if (item.operation === 'INSERT') await remoteDb.insert(pg.products).values(payload).onConflictDoNothing();
+                        else if (item.operation === 'UPDATE') await remoteDb.update(pg.products).set(payload).where(eq(pg.products.id, Number(item.recordId)));
+                        else if (item.operation === 'DELETE') await remoteDb.delete(pg.products).where(eq(pg.products.id, Number(item.recordId)));
                         break;
                     // Add other tables explicitly mapped here as needed
                     case 'sales':
                         if (item.operation === 'INSERT') {
                             const { items, ...saleData } = payload;
                             // Just sync the header for this basic example
-                            await remoteDb.insert(sales).values(saleData).onConflictDoNothing();
+                            await remoteDb.insert(pg.sales).values(saleData).onConflictDoNothing();
                         }
                         break;
 
                     case 'employees':
-                        if (item.operation === 'INSERT') await remoteDb.insert(employees).values(payload).onConflictDoNothing();
-                        else if (item.operation === 'UPDATE') await remoteDb.update(employees).set(payload).where(eq(employees.id, Number(item.recordId)));
+                        if (item.operation === 'INSERT') await remoteDb.insert(pg.employees).values(payload).onConflictDoNothing();
+                        else if (item.operation === 'UPDATE') await remoteDb.update(pg.employees).set(payload).where(eq(pg.employees.id, Number(item.recordId)));
                         break;
                 }
 

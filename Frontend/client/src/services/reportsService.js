@@ -21,6 +21,12 @@ export const reportsService = {
     const response = await fetch("/api/reports/insights");
     if (!response.ok) throw new Error("Failed to fetch insights");
     return response.json();
+  },
+
+  async getWeeklyTrend() {
+    const response = await fetch("/api/reports/weekly-trend");
+    if (!response.ok) throw new Error("Failed to fetch weekly trend");
+    return response.json();
   }
 };
 

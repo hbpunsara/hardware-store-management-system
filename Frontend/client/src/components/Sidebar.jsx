@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -10,31 +11,75 @@ import {
   Wrench,
   Users,
   Wallet,
-  CreditCard
+  CreditCard,
+  UserCheck,
+  FileText,
+  RotateCcw,
+  Tag,
+  Clock,
+  Play,
+  Square
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { Modal } from "./Modal";
+import { useToast } from "./Toast";
+import { shiftService } from "../services/shiftService";
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/", roles: ["admin", "inventory_manager"] },
   { icon: ShoppingCart, label: "POS", path: "/pos", roles: ["admin", "cashier"] },
+  { icon: RotateCcw, label: "Returns", path: "/returns", roles: ["admin", "cashier"] },
   { icon: Package, label: "Inventory", path: "/products", roles: ["admin", "inventory_manager"] },
   { icon: CreditCard, label: "Sales", path: "/sales", roles: ["admin", "cashier"] },
+  { icon: UserCheck, label: "Customers", path: "/customers", roles: ["admin", "cashier"] },
+  { icon: FileText, label: "Quotes", path: "/quotes", roles: ["admin", "cashier"] },
 ];
 
 const managementNavItems = [
   { icon: Wallet, label: "Finance", path: "/finance", roles: ["admin"] },
   { icon: Users, label: "Employees", path: "/employees", roles: ["admin"] },
   { icon: DollarSign, label: "Payroll", path: "/payroll", roles: ["admin"] },
+  { icon: Tag, label: "Promotions", path: "/promotions", roles: ["admin"] },
   { icon: BarChart3, label: "Analytics", path: "/reports", roles: ["admin"] },
 ];
 
 export const Sidebar = () => {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
+  const [activeShift, setActiveShift] = useState(null);
+  const [showShiftModal, setShowShiftModal] = useState(false);
+  const [shiftAmount, setShiftAmount] = useState("");
+  const toast = useToast();
+
+  useEffect(() => {
+    if (user && ["admin", "cashier"].includes(user.role)) {
+      shiftService.getActiveShift().then(setActiveShift).catch(() => { });
+    }
+  }, [user]);
 
   const handleLogout = () => {
     logout();
     setLocation("/login");
+  };
+
+  const handleShiftAction = async () => {
+    try {
+      if (activeShift) {
+        const actualCash = parseFloat(shiftAmount) || 0;
+        await shiftService.endShift(actualCash, activeShift.startingFloat);
+        setActiveShift(null);
+        toast.success("Shift ended successfully!");
+      } else {
+        const float = parseFloat(shiftAmount) || 0;
+        const newShift = await shiftService.startShift(float);
+        setActiveShift(newShift);
+        toast.success("Shift started successfully!");
+      }
+      setShowShiftModal(false);
+      setShiftAmount("");
+    } catch (err) {
+      toast.error(err.message || "Failed to process shift");
+    }
   };
 
   const NavItem = ({ item }) => {
@@ -109,11 +154,56 @@ export const Sidebar = () => {
             <p className="text-gray-400 text-xs">{user?.role || '—'}</p>
           </div>
         </div>
+
+        {user && ["admin", "cashier"].includes(user.role) && (
+          <button
+            onClick={() => setShowShiftModal(true)}
+            className={`nintendo-nav-item w-full mb-2 ${activeShift ? 'text-[#7AC143] hover:bg-white/10' : 'text-[#F5A623] hover:bg-white/10'}`}
+          >
+            <Clock className="w-5 h-5" />
+            <span>{activeShift ? "End Shift" : "Start Shift"}</span>
+          </button>
+        )}
+
         <button onClick={handleLogout} className="nintendo-nav-item w-full text-gray-400 hover:text-white">
           <LogOut className="w-5 h-5" />
           <span>Logout</span>
         </button>
       </div>
+      <Modal
+        isOpen={showShiftModal}
+        onClose={() => setShowShiftModal(false)}
+        title={activeShift ? "End Current Shift" : "Start New Shift"}
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600">
+            {activeShift
+              ? "Please count the cash drawer and enter the actual total amount."
+              : "Enter the starting cash float for this register."}
+          </p>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">Amount (LKR)</label>
+            <input
+              type="number"
+              className="nintendo-input w-full text-lg font-bold"
+              value={shiftAmount}
+              onChange={e => setShiftAmount(e.target.value)}
+              placeholder="0.00"
+              autoFocus
+            />
+          </div>
+          <div className="flex gap-3 justify-end pt-4">
+            <button className="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-xl" onClick={() => setShowShiftModal(false)}>Cancel</button>
+            <button
+              className={`px-4 py-2 text-white font-bold rounded-xl flex items-center gap-2 ${activeShift ? 'bg-[#E60012] hover:bg-red-700' : 'bg-[#7AC143] hover:bg-green-600'}`}
+              onClick={handleShiftAction}
+            >
+              {activeShift ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              {activeShift ? "Close Register" : "Open Register"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </aside>
   );
 };

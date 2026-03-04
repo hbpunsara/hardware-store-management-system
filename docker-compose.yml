@@ -24,16 +24,16 @@ services:
     depends_on:
       - backend
 
-  ml-service:
-    build:
-      context: ./ml-service
-      dockerfile: ../docker/ml-service/Dockerfile
-    ports:
-      - "5001:5001"
-    volumes:
-      - app-data:/app/backend
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
+  # ml-service:
+  #   build:
+  #     context: ./ml-service
+  #     dockerfile: ../docker/ml-service/Dockerfile
+  #   ports:
+  #     - "5001:5001"
+  #   volumes:
+  #     - app-data:/app/backend
+  #   environment:
+  #     - DATABASE_URL=${DATABASE_URL}
 
 volumes:
   app-data:

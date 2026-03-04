@@ -26,6 +26,28 @@ export const salesService = {
     if (!response.ok) throw new Error("Failed to fetch today's summary");
     return response.json();
   },
+
+  async voidSale(id, managerPin) {
+    const response = await fetch(`/api/sales/${id}/void`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ managerPin }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to void sale");
+    return data;
+  },
+
+  async emailInvoice(id, email) {
+    const response = await fetch(`/api/sales/${id}/email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to email invoice");
+    return data;
+  }
 };
 
 export default salesService;

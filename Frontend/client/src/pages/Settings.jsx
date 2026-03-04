@@ -4,13 +4,13 @@ import { Navbar } from "../components/Navbar";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { useToast } from "../components/Toast";
-import { 
-  User, 
-  Store, 
-  Printer, 
-  Database, 
-  Cloud, 
-  Shield, 
+import {
+  User,
+  Store,
+  Printer,
+  Database,
+  Cloud,
+  Shield,
   Bell,
   Save,
   RefreshCw,
@@ -21,12 +21,14 @@ import {
 } from "lucide-react";
 import { storeService } from "../services/storeService";
 import { userService } from "../services/userService";
+import { pricingTiersService } from "../services/pricingTiersService";
 
 const settingsSections = [
   { id: "store", label: "Store Profile", icon: Store },
   { id: "users", label: "User Management", icon: User },
   { id: "pos", label: "POS Settings", icon: Printer },
   { id: "database", label: "Database & Backup", icon: Database },
+  { id: "pricing", label: "Pricing Tiers", icon: Store },
   { id: "cloud", label: "Cloud Sync", icon: Cloud },
   { id: "security", label: "Security", icon: Shield },
   { id: "notifications", label: "Notifications", icon: Bell },
@@ -56,6 +58,9 @@ export const Settings = () => {
     role: "Cashier",
     password: ""
   });
+  const [pricingTiers, setPricingTiers] = useState([]);
+  const [tiersLoading, setTiersLoading] = useState(false);
+  const [tierValues, setTierValues] = useState({});
   const toast = useToast();
 
   const fetchStoreSettings = async () => {
@@ -89,6 +94,21 @@ export const Settings = () => {
     }
   };
 
+  const fetchPricingTiers = async () => {
+    try {
+      setTiersLoading(true);
+      const data = await pricingTiersService.getAll();
+      setPricingTiers(data);
+      const initialVals = {};
+      data.forEach(t => initialVals[t.tierName] = t.multiplier);
+      setTierValues(initialVals);
+    } catch (err) {
+      toast.error("Failed to load pricing tiers");
+    } finally {
+      setTiersLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchStoreSettings();
   }, []);
@@ -96,6 +116,8 @@ export const Settings = () => {
   useEffect(() => {
     if (activeSection === "users") {
       fetchUsers();
+    } else if (activeSection === "pricing") {
+      fetchPricingTiers();
     }
   }, [activeSection]);
 
@@ -147,9 +169,17 @@ export const Settings = () => {
     setSelectedUser(null);
   };
 
-  const toggleUserStatus = (user) => {
-    toast.info("User status toggle coming soon. Use database to activate/deactivate users.");
+  const toggleUserStatus = async (user) => {
+    const newStatus = user.status === "Active" ? "Inactive" : "Active";
+    try {
+      await userService.update(user.id, { status: newStatus });
+      toast.success(`${user.name} is now ${newStatus}`);
+      fetchUsers();
+    } catch (err) {
+      toast.error(err.message || "Failed to update user status");
+    }
   };
+
 
   const renderStoreProfile = () => (
     <div className="space-y-6">
@@ -159,7 +189,7 @@ export const Settings = () => {
           <input
             type="text"
             value={storeData.name}
-            onChange={(e) => setStoreData({...storeData, name: e.target.value})}
+            onChange={(e) => setStoreData({ ...storeData, name: e.target.value })}
             className="nintendo-input"
           />
         </div>
@@ -168,7 +198,7 @@ export const Settings = () => {
           <input
             type="email"
             value={storeData.email}
-            onChange={(e) => setStoreData({...storeData, email: e.target.value})}
+            onChange={(e) => setStoreData({ ...storeData, email: e.target.value })}
             className="nintendo-input"
           />
         </div>
@@ -177,7 +207,7 @@ export const Settings = () => {
           <input
             type="tel"
             value={storeData.phone}
-            onChange={(e) => setStoreData({...storeData, phone: e.target.value})}
+            onChange={(e) => setStoreData({ ...storeData, phone: e.target.value })}
             className="nintendo-input"
           />
         </div>
@@ -186,7 +216,7 @@ export const Settings = () => {
           <input
             type="text"
             value={storeData.taxId}
-            onChange={(e) => setStoreData({...storeData, taxId: e.target.value})}
+            onChange={(e) => setStoreData({ ...storeData, taxId: e.target.value })}
             className="nintendo-input"
           />
         </div>
@@ -194,16 +224,16 @@ export const Settings = () => {
           <label className="block text-sm font-bold text-gray-700 mb-2">Address</label>
           <textarea
             value={storeData.address}
-            onChange={(e) => setStoreData({...storeData, address: e.target.value})}
+            onChange={(e) => setStoreData({ ...storeData, address: e.target.value })}
             rows={3}
             className="nintendo-input"
           />
         </div>
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">Currency</label>
-          <select 
+          <select
             value={storeData.currency}
-            onChange={(e) => setStoreData({...storeData, currency: e.target.value})}
+            onChange={(e) => setStoreData({ ...storeData, currency: e.target.value })}
             className="nintendo-input"
           >
             <option value="LKR">LKR - Sri Lankan Rupee</option>
@@ -253,11 +283,10 @@ export const Settings = () => {
                   </div>
                 </td>
                 <td>
-                  <span className={`nintendo-badge ${
-                    user.role === "Administrator" ? "bg-[#9B59B6]/20 text-[#9B59B6]" :
+                  <span className={`nintendo-badge ${user.role === "Administrator" ? "bg-[#9B59B6]/20 text-[#9B59B6]" :
                     user.role === "Cashier" ? "nintendo-badge-info" :
-                    "nintendo-badge-warning"
-                  }`}>
+                      "nintendo-badge-warning"
+                    }`}>
                     {user.role}
                   </span>
                 </td>
@@ -584,12 +613,67 @@ export const Settings = () => {
     </div>
   );
 
+  const handleUpdateTier = async (tierName, multiplier) => {
+    try {
+      await pricingTiersService.update({ tierName, multiplier });
+      toast.success(`Updated ${tierName} tier multiplier successfully!`);
+      fetchPricingTiers();
+    } catch (err) {
+      toast.error(err.message || "Failed to update pricing tier");
+    }
+  };
+
+  const renderPricingTiers = () => (
+    <div className="space-y-6">
+      <div className="nintendo-card p-6">
+        <h4 className="font-bold text-xl text-gray-900 mb-4">Customer Pricing Tiers</h4>
+        <p className="text-sm text-gray-500 mb-6">Set multiplier rates for different customer types. E.g., a 0.9 multiplier gives a 10% discount across all products.</p>
+        <div className="space-y-4">
+          <table className="nintendo-table w-full text-left">
+            <thead>
+              <tr>
+                <th className="font-bold p-3">Tier Name</th>
+                <th className="font-bold p-3">Multiplier (e.g. 1.0 = Base Price)</th>
+                <th className="font-bold p-3">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {["Regular", "Contractor", "Wholesale", "VIP"].map((tierName) => {
+                const val = tierValues[tierName] !== undefined ? tierValues[tierName] : 1.0;
+
+                return (
+                  <tr key={tierName} className="border-t border-gray-100">
+                    <td className="p-3 font-medium text-gray-900">{tierName}</td>
+                    <td className="p-3">
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={val}
+                        onChange={(e) => setTierValues({ ...tierValues, [tierName]: e.target.value })}
+                        className="nintendo-input w-24"
+                      />
+                    </td>
+                    <td className="p-3">
+                      <Button variant="secondary" size="sm" onClick={() => handleUpdateTier(tierName, Number(val))}>Save</Button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderSection = () => {
     switch (activeSection) {
       case "store": return renderStoreProfile();
       case "users": return renderUserManagement();
       case "pos": return renderPOSSettings();
       case "database": return renderDatabaseBackup();
+      case "pricing": return renderPricingTiers();
       case "cloud": return renderCloudSync();
       case "security": return renderSecurity();
       case "notifications": return renderNotifications();
@@ -602,7 +686,7 @@ export const Settings = () => {
       <Sidebar />
       <main className="flex-1">
         <Navbar title="Settings" />
-        
+
         <div className="p-6">
           <div className="flex gap-6">
             <div className="w-64 space-y-2">
@@ -612,11 +696,10 @@ export const Settings = () => {
                   <button
                     key={section.id}
                     onClick={() => setActiveSection(section.id)}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all ${
-                      activeSection === section.id
-                        ? "bg-[#E60012] text-white shadow-lg"
-                        : "bg-white text-gray-700 hover:bg-gray-50"
-                    }`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold transition-all ${activeSection === section.id
+                      ? "bg-[#E60012] text-white shadow-lg"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
                   >
                     <Icon className="w-5 h-5" />
                     {section.label}
@@ -642,7 +725,7 @@ export const Settings = () => {
               <input
                 type="text"
                 value={userFormData.name}
-                onChange={(e) => setUserFormData({...userFormData, name: e.target.value})}
+                onChange={(e) => setUserFormData({ ...userFormData, name: e.target.value })}
                 placeholder="e.g., John Perera"
                 className="nintendo-input"
               />
@@ -652,7 +735,7 @@ export const Settings = () => {
               <input
                 type="email"
                 value={userFormData.email}
-                onChange={(e) => setUserFormData({...userFormData, email: e.target.value})}
+                onChange={(e) => setUserFormData({ ...userFormData, email: e.target.value })}
                 placeholder="john@store.com"
                 className="nintendo-input"
               />
@@ -661,7 +744,7 @@ export const Settings = () => {
               <label className="block text-sm font-bold text-gray-700 mb-2">Role</label>
               <select
                 value={userFormData.role}
-                onChange={(e) => setUserFormData({...userFormData, role: e.target.value})}
+                onChange={(e) => setUserFormData({ ...userFormData, role: e.target.value })}
                 className="nintendo-input"
               >
                 {roles.map(role => (
@@ -674,7 +757,7 @@ export const Settings = () => {
               <input
                 type="password"
                 value={userFormData.password}
-                onChange={(e) => setUserFormData({...userFormData, password: e.target.value})}
+                onChange={(e) => setUserFormData({ ...userFormData, password: e.target.value })}
                 placeholder="••••••••"
                 className="nintendo-input"
               />

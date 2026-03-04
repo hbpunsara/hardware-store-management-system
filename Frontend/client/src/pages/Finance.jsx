@@ -4,8 +4,8 @@ import { Navbar } from "../components/Navbar";
 import { Button } from "../components/Button";
 import { Modal } from "../components/Modal";
 import { useToast } from "../components/Toast";
-import { 
-  TrendingUp, 
+import {
+  TrendingUp,
   TrendingDown,
   ArrowUpRight,
   ArrowDownRight,
@@ -17,6 +17,7 @@ import {
   Save
 } from "lucide-react";
 import { transactionService } from "../services/transactionService";
+import { reportsService } from "../services/reportsService";
 
 const categories = ["Sales", "Inventory", "Utilities", "Payroll", "Rent", "Maintenance", "Marketing", "Other"];
 const paymentMethods = ["Cash", "Card", "Bank Transfer", "Cheque", "Mobile Payment"];
@@ -25,6 +26,7 @@ export const Finance = () => {
   const [filterType, setFilterType] = useState("all");
   const [dateRange, setDateRange] = useState("today");
   const [transactions, setTransactions] = useState([]);
+  const [weeklyTrend, setWeeklyTrend] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [formData, setFormData] = useState({
@@ -40,8 +42,12 @@ export const Finance = () => {
   const fetchTransactions = async () => {
     try {
       setLoading(true);
-      const data = await transactionService.getAll();
+      const [data, trend] = await Promise.all([
+        transactionService.getAll(),
+        reportsService.getWeeklyTrend().catch(() => [])
+      ]);
       setTransactions(data);
+      setWeeklyTrend(trend);
     } catch (err) {
       toast.error("Failed to load transactions");
     } finally {
@@ -87,7 +93,7 @@ export const Finance = () => {
     }
   };
 
-  const filteredTransactions = transactions.filter(t => 
+  const filteredTransactions = transactions.filter(t =>
     filterType === "all" || t.type === filterType
   );
 
@@ -110,11 +116,13 @@ export const Finance = () => {
     };
   });
 
+  const profitMargin = totalIncome > 0 ? Math.round((netProfit / totalIncome) * 100) : 0;
+
   const financeStats = [
-    { label: "Total Revenue", value: `LKR ${formatCurrency(totalIncome)}`, change: "+12.5%", trend: "up", icon: TrendingUp, color: "bg-[#7AC143]" },
-    { label: "Total Expenses", value: `LKR ${formatCurrency(totalExpense)}`, change: "-8.2%", trend: "down", icon: TrendingDown, color: "bg-[#E60012]" },
-    { label: "Net Profit", value: `LKR ${formatCurrency(netProfit)}`, change: "+18.4%", trend: "up", icon: Wallet, color: "bg-[#0AB5CD]" },
-    { label: "Transactions", value: transactions.length.toString(), change: "+5.1%", trend: "up", icon: PiggyBank, color: "bg-[#F5A623]" },
+    { label: "Total Revenue", value: `LKR ${formatCurrency(totalIncome)}`, change: totalIncome > 0 ? `+${profitMargin}%` : "—", trend: "up", icon: TrendingUp, color: "bg-[#7AC143]" },
+    { label: "Total Expenses", value: `LKR ${formatCurrency(totalExpense)}`, change: totalExpense > 0 ? `${Math.round((totalExpense / Math.max(totalIncome, 1)) * 100)}%` : "—", trend: "down", icon: TrendingDown, color: "bg-[#E60012]" },
+    { label: "Net Profit", value: `LKR ${formatCurrency(netProfit)}`, change: netProfit >= 0 ? `${profitMargin}% margin` : "Loss", trend: netProfit >= 0 ? "up" : "down", icon: Wallet, color: "bg-[#0AB5CD]" },
+    { label: "Transactions", value: transactions.length.toString(), change: `${transactions.length} total`, trend: "up", icon: PiggyBank, color: "bg-[#F5A623]" },
   ];
 
   return (
@@ -122,7 +130,7 @@ export const Finance = () => {
       <Sidebar />
       <main className="flex-1">
         <Navbar title="Finance Management" />
-        
+
         <div className="p-6 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex gap-3">
@@ -140,7 +148,23 @@ export const Finance = () => {
               </Button>
             </div>
             <div className="flex gap-3">
-              <Button variant="secondary" onClick={() => toast.success("Exporting financial report...")}>
+              <Button variant="secondary" onClick={() => {
+                try {
+                  const headers = ["Date", "Description", "Category", "Method", "Type", "Amount"];
+                  const rows = transactions.map(t => [t.date, t.description, t.category, t.method, t.type, t.amount]);
+                  const csvContent = [headers, ...rows].map(r => r.join(",")).join("\n");
+                  const blob = new Blob([csvContent], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `finance-report-${new Date().toISOString().split("T")[0]}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success("Financial report exported!");
+                } catch (err) {
+                  toast.error("Failed to export report");
+                }
+              }}>
                 <Download className="w-4 h-4 mr-2" /> Export Report
               </Button>
               <Button onClick={() => setShowAddModal(true)}>
@@ -158,9 +182,8 @@ export const Finance = () => {
                     <div className={`w-12 h-12 ${stat.color} rounded-xl flex items-center justify-center shadow-lg`}>
                       <Icon className="w-6 h-6 text-white" />
                     </div>
-                    <span className={`nintendo-badge flex items-center gap-1 ${
-                      stat.trend === "up" ? "nintendo-badge-success" : "nintendo-badge-danger"
-                    }`}>
+                    <span className={`nintendo-badge flex items-center gap-1 ${stat.trend === "up" ? "nintendo-badge-success" : "nintendo-badge-danger"
+                      }`}>
                       {stat.trend === "up" ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
                       {stat.change}
                     </span>
@@ -180,25 +203,22 @@ export const Finance = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setFilterType("all")}
-                      className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                        filterType === "all" ? "bg-[#E60012] text-white" : "bg-gray-100 text-gray-600"
-                      }`}
+                      className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === "all" ? "bg-[#E60012] text-white" : "bg-gray-100 text-gray-600"
+                        }`}
                     >
                       All
                     </button>
                     <button
                       onClick={() => setFilterType("income")}
-                      className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                        filterType === "income" ? "bg-[#7AC143] text-white" : "bg-gray-100 text-gray-600"
-                      }`}
+                      className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === "income" ? "bg-[#7AC143] text-white" : "bg-gray-100 text-gray-600"
+                        }`}
                     >
                       Income
                     </button>
                     <button
                       onClick={() => setFilterType("expense")}
-                      className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                        filterType === "expense" ? "bg-[#E60012] text-white" : "bg-gray-100 text-gray-600"
-                      }`}
+                      className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${filterType === "expense" ? "bg-[#E60012] text-white" : "bg-gray-100 text-gray-600"
+                        }`}
                     >
                       Expenses
                     </button>
@@ -228,9 +248,8 @@ export const Finance = () => {
                         </td>
                         <td className="text-gray-600">{tx.method}</td>
                         <td>
-                          <span className={`font-bold flex items-center gap-1 ${
-                            tx.type === "income" ? "text-[#7AC143]" : "text-[#E60012]"
-                          }`}>
+                          <span className={`font-bold flex items-center gap-1 ${tx.type === "income" ? "text-[#7AC143]" : "text-[#E60012]"
+                            }`}>
                             {tx.type === "income" ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
                             LKR {formatCurrency(tx.amount)}
                           </span>
@@ -255,7 +274,7 @@ export const Finance = () => {
                         <span className="text-sm font-bold text-gray-900">{cat.percentage}%</span>
                       </div>
                       <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className={`h-full ${cat.color} rounded-full transition-all duration-500`}
                           style={{ width: `${cat.percentage}%` }}
                         />
@@ -271,54 +290,43 @@ export const Finance = () => {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
                     <span className="text-gray-600">Gross Profit Margin</span>
-                    <span className="font-bold text-[#7AC143]">24.5%</span>
+                    <span className="font-bold text-[#7AC143]">{profitMargin}%</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-                    <span className="text-gray-600">Monthly Target</span>
-                    <span className="font-bold text-gray-900">78% achieved</span>
+                    <span className="text-gray-600">Income Entries</span>
+                    <span className="font-bold text-gray-900">{transactions.filter(t => t.type === "income").length} records</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-                    <span className="text-gray-600">Pending Payments</span>
-                    <span className="font-bold text-[#F5A623]">LKR 45,000</span>
+                    <span className="text-gray-600">Expense Entries</span>
+                    <span className="font-bold text-[#F5A623]">{transactions.filter(t => t.type === "expense").length} records</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
-                    <span className="text-gray-600">Accounts Receivable</span>
-                    <span className="font-bold text-[#0AB5CD]">LKR 125,000</span>
+                    <span className="text-gray-600">Net Position</span>
+                    <span className={`font-bold ${netProfit >= 0 ? "text-[#7AC143]" : "text-[#E60012]"}`}>LKR {formatCurrency(netProfit)}</span>
                   </div>
                 </div>
               </div>
 
               <div className="nintendo-card p-6">
-                <h4 className="font-bold text-lg text-gray-900 mb-4">Cash Flow Summary</h4>
+                <h4 className="font-bold text-lg text-gray-900 mb-4">7-Day Revenue</h4>
                 <div className="flex items-end justify-between gap-2 h-32">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => {
-                    const incomeHeights = [45, 62, 38, 75, 55, 85, 48];
-                    const expenseHeights = [30, 45, 28, 55, 40, 60, 35];
-                    return (
-                      <div key={day} className="flex-1 flex flex-col items-center gap-1">
-                        <div className="w-full flex flex-col gap-1">
-                          <div 
-                            className="w-full bg-[#7AC143] rounded-t"
-                            style={{ height: `${incomeHeights[i]}%` }}
-                          />
-                          <div 
-                            className="w-full bg-[#E60012] rounded-b"
-                            style={{ height: `${expenseHeights[i]}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-medium text-gray-500">{day}</span>
-                      </div>
-                    );
-                  })}
+                  {weeklyTrend.length === 0 ? (
+                    <p className="text-gray-500 text-sm w-full text-center py-4">No sales data yet</p>
+                  ) : weeklyTrend.map((d, i) => (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                      <div
+                        className="w-full bg-gradient-to-t from-[#7AC143] to-[#a8e063] rounded-t transition-all duration-500"
+                        style={{ height: `${d.heightPct || 5}%` }}
+                        title={`LKR ${formatCurrency(d.revenue)}`}
+                      />
+                      <span className="text-xs font-medium text-gray-500">{d.day}</span>
+                    </div>
+                  ))}
                 </div>
                 <div className="flex justify-center gap-6 mt-4">
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 bg-[#7AC143] rounded" />
-                    <span className="text-xs text-gray-600">Income</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-[#E60012] rounded" />
-                    <span className="text-xs text-gray-600">Expenses</span>
+                    <span className="text-xs text-gray-600">Daily Revenue (this week)</span>
                   </div>
                 </div>
               </div>
@@ -330,23 +338,21 @@ export const Finance = () => {
           <div className="space-y-5">
             <div className="flex gap-3">
               <button
-                onClick={() => setFormData({...formData, type: "income"})}
-                className={`flex-1 py-3 rounded-xl font-bold transition-all ${
-                  formData.type === "income" 
-                    ? "bg-[#7AC143] text-white" 
-                    : "bg-gray-100 text-gray-600"
-                }`}
+                onClick={() => setFormData({ ...formData, type: "income" })}
+                className={`flex-1 py-3 rounded-xl font-bold transition-all ${formData.type === "income"
+                  ? "bg-[#7AC143] text-white"
+                  : "bg-gray-100 text-gray-600"
+                  }`}
               >
                 <ArrowUpRight className="w-5 h-5 inline mr-2" />
                 Income
               </button>
               <button
-                onClick={() => setFormData({...formData, type: "expense"})}
-                className={`flex-1 py-3 rounded-xl font-bold transition-all ${
-                  formData.type === "expense" 
-                    ? "bg-[#E60012] text-white" 
-                    : "bg-gray-100 text-gray-600"
-                }`}
+                onClick={() => setFormData({ ...formData, type: "expense" })}
+                className={`flex-1 py-3 rounded-xl font-bold transition-all ${formData.type === "expense"
+                  ? "bg-[#E60012] text-white"
+                  : "bg-gray-100 text-gray-600"
+                  }`}
               >
                 <ArrowDownRight className="w-5 h-5 inline mr-2" />
                 Expense
@@ -357,7 +363,7 @@ export const Finance = () => {
               <input
                 type="text"
                 value={formData.description}
-                onChange={(e) => setFormData({...formData, description: e.target.value})}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="e.g., Daily Sales Revenue"
                 className="nintendo-input"
               />
@@ -368,7 +374,7 @@ export const Finance = () => {
                 <input
                   type="number"
                   value={formData.amount}
-                  onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                   placeholder="0.00"
                   className="nintendo-input"
                 />
@@ -378,7 +384,7 @@ export const Finance = () => {
                 <input
                   type="date"
                   value={formData.date}
-                  onChange={(e) => setFormData({...formData, date: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   className="nintendo-input"
                 />
               </div>
@@ -388,7 +394,7 @@ export const Finance = () => {
                 <label className="block text-sm font-bold text-gray-700 mb-2">Category</label>
                 <select
                   value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                   className="nintendo-input"
                 >
                   {categories.map(cat => (
@@ -400,7 +406,7 @@ export const Finance = () => {
                 <label className="block text-sm font-bold text-gray-700 mb-2">Payment Method</label>
                 <select
                   value={formData.method}
-                  onChange={(e) => setFormData({...formData, method: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, method: e.target.value })}
                   className="nintendo-input"
                 >
                   {paymentMethods.map(method => (

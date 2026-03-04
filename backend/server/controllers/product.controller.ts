@@ -46,7 +46,7 @@ export const productController = {
         sku: String(sku).trim(),
         name: String(name).trim(),
         category: String(category),
-        price: String(priceNum),
+        price: priceNum,
         stock: Number(stock) || 0,
         supplier: supplier ? String(supplier) : null,
       };

@@ -135,7 +135,23 @@ export const Payroll = () => {
               <Button variant="secondary" onClick={handleCalculateAll}>
                 <Calculator className="w-4 h-4 mr-2" /> Calculate All
               </Button>
-              <Button variant="secondary" onClick={() => toast.success("Exporting payroll data...")}>
+              <Button variant="secondary" onClick={() => {
+                try {
+                  const headers = ["Name", "Role", "Days Worked", "Base Salary", "Overtime", "Allowances", "Deductions", "Net Salary", "Status"];
+                  const rows = payrollData.map(e => [e.name, e.role, e.daysWorked, e.baseSalary, e.overtime, e.allowances, e.deductions, e.netSalary, e.status]);
+                  const csvContent = [headers, ...rows].map(r => r.join(",")).join("\n");
+                  const blob = new Blob([csvContent], { type: "text/csv" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `payroll-${selectedMonth.replace(/ /g, "-")}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  toast.success("Payroll data exported!");
+                } catch (err) {
+                  toast.error("Failed to export");
+                }
+              }}>
                 <Download className="w-4 h-4 mr-2" /> Export
               </Button>
               <Button onClick={handleProcessPayroll}>

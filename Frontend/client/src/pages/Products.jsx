@@ -25,6 +25,7 @@ export const Products = () => {
     name: "",
     category: "Tools",
     price: "",
+    costPrice: "",
     stock: "",
     supplier: "ForgeCo"
   });
@@ -61,6 +62,7 @@ export const Products = () => {
         name: formData.name,
         category: formData.category,
         price: parseFloat(formData.price),
+        costPrice: parseFloat(formData.costPrice) || 0,
         stock: parseInt(formData.stock) || 0,
         supplier: formData.supplier
       });
@@ -84,6 +86,7 @@ export const Products = () => {
         name: formData.name,
         category: formData.category,
         price: parseFloat(formData.price),
+        costPrice: parseFloat(formData.costPrice) || 0,
         stock: parseInt(formData.stock) || 0,
         supplier: formData.supplier
       });
@@ -116,6 +119,7 @@ export const Products = () => {
       name: product.name,
       category: product.category,
       price: product.price.toString(),
+      costPrice: (product.costPrice || 0).toString(),
       stock: product.stock.toString(),
       supplier: product.supplier || "ForgeCo"
     });
@@ -133,14 +137,15 @@ export const Products = () => {
       name: "",
       category: "Tools",
       price: "",
+      costPrice: "",
       stock: "",
       supplier: "ForgeCo"
     });
   };
 
   const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         p.sku.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.sku.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -157,7 +162,7 @@ export const Products = () => {
       <Sidebar />
       <main className="flex-1">
         <Navbar title="Products & Inventory" />
-        
+
         <div className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex gap-3">
@@ -174,7 +179,7 @@ export const Products = () => {
               <Button variant="secondary" onClick={() => setShowFilterModal(true)}>
                 <Filter className="w-4 h-4 mr-2" /> Filter
               </Button>
-              <select 
+              <select
                 className="nintendo-input w-48"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
@@ -248,6 +253,7 @@ export const Products = () => {
                     <th>Product</th>
                     <th>Category</th>
                     <th>Price</th>
+                    <th>Margin</th>
                     <th>Stock</th>
                     <th>Supplier</th>
                     <th>Actions</th>
@@ -255,8 +261,8 @@ export const Products = () => {
                 </thead>
                 <tbody>
                   {filteredProducts.map((product) => (
-                    <tr 
-                      key={product.id} 
+                    <tr
+                      key={product.id}
                       className={product.stock <= 10 ? 'bg-[#E60012]/5' : ''}
                     >
                       <td className="font-mono font-bold text-gray-600">{product.sku}</td>
@@ -270,6 +276,13 @@ export const Products = () => {
                         <span className="nintendo-badge nintendo-badge-info">{product.category}</span>
                       </td>
                       <td className="font-bold text-gray-900">LKR {formatCurrency(product.price)}</td>
+                      <td className="font-bold">
+                        {product.price > 0 ? (
+                          <span className={((product.price - (product.costPrice || 0)) / product.price) * 100 > 0 ? "text-[#7AC143]" : "text-[#E60012]"}>
+                            {(((product.price - (product.costPrice || 0)) / product.price) * 100).toFixed(1)}%
+                          </span>
+                        ) : <span className="text-gray-400">—</span>}
+                      </td>
                       <td>
                         <span className={`font-bold ${product.stock <= 10 ? 'text-[#E60012]' : 'text-gray-900'}`}>
                           {product.stock}
@@ -304,31 +317,35 @@ export const Products = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">SKU *</label>
-                <input type="text" value={formData.sku} onChange={(e) => setFormData({...formData, sku: e.target.value})} placeholder="e.g., HAM-16" className="nintendo-input" />
+                <input type="text" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} placeholder="e.g., HAM-16" className="nintendo-input" />
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Product Name *</label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="e.g., Hammer 16oz" className="nintendo-input" />
+                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Hammer 16oz" className="nintendo-input" />
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Category</label>
-                <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="nintendo-input">
+                <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="nintendo-input">
                   {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Supplier</label>
-                <select value={formData.supplier} onChange={(e) => setFormData({...formData, supplier: e.target.value})} className="nintendo-input">
+                <select value={formData.supplier} onChange={(e) => setFormData({ ...formData, supplier: e.target.value })} className="nintendo-input">
                   {suppliers.map(sup => (<option key={sup} value={sup}>{sup}</option>))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Price (LKR) *</label>
-                <input type="number" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} placeholder="0.00" className="nintendo-input" />
+                <input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} placeholder="0.00" className="nintendo-input" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Cost Price (LKR)</label>
+                <input type="number" value={formData.costPrice} onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })} placeholder="0.00" className="nintendo-input" />
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Initial Stock</label>
-                <input type="number" value={formData.stock} onChange={(e) => setFormData({...formData, stock: e.target.value})} placeholder="0" className="nintendo-input" />
+                <input type="number" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} placeholder="0" className="nintendo-input" />
               </div>
             </div>
             <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">
@@ -343,31 +360,35 @@ export const Products = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">SKU *</label>
-                <input type="text" value={formData.sku} onChange={(e) => setFormData({...formData, sku: e.target.value})} className="nintendo-input" />
+                <input type="text" value={formData.sku} onChange={(e) => setFormData({ ...formData, sku: e.target.value })} className="nintendo-input" />
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Product Name *</label>
-                <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="nintendo-input" />
+                <input type="text" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="nintendo-input" />
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Category</label>
-                <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} className="nintendo-input">
+                <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="nintendo-input">
                   {categories.map(cat => (<option key={cat} value={cat}>{cat}</option>))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Supplier</label>
-                <select value={formData.supplier} onChange={(e) => setFormData({...formData, supplier: e.target.value})} className="nintendo-input">
+                <select value={formData.supplier} onChange={(e) => setFormData({ ...formData, supplier: e.target.value })} className="nintendo-input">
                   {suppliers.map(sup => (<option key={sup} value={sup}>{sup}</option>))}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Price (LKR) *</label>
-                <input type="number" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="nintendo-input" />
+                <input type="number" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} className="nintendo-input" />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">Cost Price (LKR)</label>
+                <input type="number" value={formData.costPrice} onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })} className="nintendo-input" />
               </div>
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">Stock</label>
-                <input type="number" value={formData.stock} onChange={(e) => setFormData({...formData, stock: e.target.value})} className="nintendo-input" />
+                <input type="number" value={formData.stock} onChange={(e) => setFormData({ ...formData, stock: e.target.value })} className="nintendo-input" />
               </div>
             </div>
             <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">
