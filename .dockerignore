@@ -23,4 +23,4 @@ dist
 Thumbs.db
 
 # Don't copy other app contexts into backend/frontend builds
-electron
+# electron

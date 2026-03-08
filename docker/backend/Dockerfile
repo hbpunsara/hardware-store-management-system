@@ -22,6 +22,11 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist ./dist
 
+COPY backend/drizzle.config.ts backend/drizzle.config.pg.ts ./
+COPY backend/shared ./shared
+COPY backend/migrations-pg ./migrations-pg
+
 EXPOSE 5000
 
-CMD ["node", "dist/index.js"]
+# We need to install drizzle-kit for the push command
+CMD npx drizzle-kit push --config=drizzle.config.pg.ts && node dist/index.js

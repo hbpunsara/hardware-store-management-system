@@ -352,19 +352,6 @@ export const POS = () => {
       return;
     }
 
-    if (tenderMethod === "Store Account") {
-      if (!selectedCustomer) {
-        toast.error("Must select a customer for Store Account!");
-        return;
-      }
-      const existingAccountTenders = tenders.filter(t => t.method === "Store Account").reduce((sum, t) => sum + t.amount, 0);
-      const availableCredit = selectedCustomer.creditLimit - selectedCustomer.accountBalance - existingAccountTenders;
-      if (amt > availableCredit && selectedCustomer.creditLimit > 0) {
-        toast.error(`Exceeds credit limit. Available: LKR ${availableCredit.toLocaleString()}`);
-        return;
-      }
-    }
-
     setTenders([...tenders, { method: tenderMethod, amount: amt }]);
     setTenderAmountInput("");
   };
@@ -816,13 +803,6 @@ export const POS = () => {
                     <Smartphone className="w-5 h-5 text-[#9B59B6]" />
                     <span className="text-xs font-bold text-gray-700">Mobile</span>
                   </button>
-                  <button
-                    onClick={() => { setTenderMethod("Store Account"); handlePayment(); }}
-                    className="flex flex-col items-center gap-1 p-3 bg-orange-50 rounded-xl hover:bg-orange-100 transition-colors border border-orange-200"
-                  >
-                    <Users className="w-5 h-5 text-orange-500" />
-                    <span className="text-xs font-bold text-orange-700 text-center leading-tight">Net 30</span>
-                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mt-4">
@@ -896,7 +876,6 @@ export const POS = () => {
                   <option value="Cash">Cash</option>
                   <option value="Card">Card</option>
                   <option value="Mobile">Mobile Pay</option>
-                  <option value="Store Account">Store Account</option>
                   <option value="Check">Check</option>
                   <option value="Store Credit">Store Credit</option>
                   <option value="Financing">Financing</option>
@@ -920,7 +899,6 @@ export const POS = () => {
                     {t.method === 'Cash' && <Banknote className="w-4 h-4 text-[#7AC143]" />}
                     {t.method === 'Card' && <CreditCard className="w-4 h-4 text-[#0AB5CD]" />}
                     {t.method === 'Mobile' && <Smartphone className="w-4 h-4 text-[#9B59B6]" />}
-                    {t.method === 'Store Account' && <Users className="w-4 h-4 text-orange-500" />}
                     <span className="font-bold text-gray-700 text-sm">{t.method}</span>
                   </div>
                   <div className="flex items-center gap-3">

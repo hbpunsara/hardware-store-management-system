@@ -28,4 +28,5 @@ export const getRemoteDb = () => {
 
 // Backwards compatibility for existing controllers trying to just use `db`
 // In a fully offline-first app, all reads/writes should go to `localDb`
-export const db = localDb;
+// NOTE: Since we are running in a Docker container connected to Postgres, we should use the remote DB if configured.
+export const db = process.env.DATABASE_URL ? getRemoteDb()! : localDb;

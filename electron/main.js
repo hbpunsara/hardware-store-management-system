@@ -2,7 +2,7 @@
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 
-const DEV_SERVER_URL = 'http://localhost:5173';
+const SERVER_URL = process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : 'http://127.0.0.1';
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -23,16 +23,16 @@ function createWindow() {
   // Hide the default menu bar for a clean POS look
   Menu.setApplicationMenu(null);
 
-  // Load the Vite dev server
-  win.loadURL(DEV_SERVER_URL).catch(() => {
-    // If dev server isn't ready yet, show a friendly message
+  // Load the web app
+  win.loadURL(SERVER_URL).catch(() => {
+    // If server isn't ready yet, show a friendly message
     win.loadURL(`data:text/html,
       <html>
         <body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#F5F5F5;">
           <div style="text-align:center;">
             <h2>⏳ Waiting for dev server...</h2>
-            <p>Make sure the frontend is running: <code>cd Frontend &amp;&amp; npm run dev</code></p>
-            <button onclick="window.location.href='${DEV_SERVER_URL}'" 
+            <p>Make sure the frontend is running either via Docker or locally: <code>cd Frontend &amp;&amp; npm run dev</code></p>
+            <button onclick="window.location.href='${SERVER_URL}'" 
               style="margin-top:16px;padding:10px 24px;background:#E60012;color:white;border:none;border-radius:8px;cursor:pointer;font-size:16px;">
               Retry
             </button>
