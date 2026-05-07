@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 export const promotionsService = {
     getAll: async () => {
         const response = await fetch('/api/promotions');

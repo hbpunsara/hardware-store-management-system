@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 export const storeService = {
   async getAll() {
     const response = await fetch("/api/store-settings");

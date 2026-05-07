@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 export const reportsService = {
   async getOverview() {
     const response = await fetch("/api/reports/overview");
@@ -26,6 +27,17 @@ export const reportsService = {
   async getWeeklyTrend() {
     const response = await fetch("/api/reports/weekly-trend");
     if (!response.ok) throw new Error("Failed to fetch weekly trend");
+    return response.json();
+  },
+
+  async trainML() {
+    const response = await fetch("/api/ml/train", {
+      method: "POST"
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || "Failed to train ML models");
+    }
     return response.json();
   }
 };

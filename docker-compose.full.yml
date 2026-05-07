@@ -34,6 +34,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - backend-backups:/app/backups
+      - backend-uploads:/app/public/uploads
 
   frontend:
     build:
@@ -54,3 +57,6 @@ services:
 
 volumes:
   postgres-data:
+  backend-backups:
+  backend-uploads:
+

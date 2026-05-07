@@ -1,10 +1,12 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, Link } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ToastProvider } from "@/components/Toast";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { Wrench } from "lucide-react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 import { Dashboard } from "@/pages/Dashboard";
 import { POS } from "@/pages/POS";
@@ -62,10 +64,18 @@ function Router() {
       <ProtectedRoute path="/settings" component={Settings} allowedRoles={["admin"]} />
       <Route path="/login" component={Login} />
       <Route>
-        <div className="flex items-center justify-center min-h-screen bg-[#F5F5F5]">
-          <div className="nintendo-card p-12 text-center">
-            <h1 className="text-4xl font-extrabold text-gray-900 mb-4">404</h1>
-            <p className="text-gray-500 font-medium">Page not found</p>
+        <div className="min-h-screen bg-[#F5F5F5] flex flex-col items-center justify-center p-4">
+          <div className="nintendo-card max-w-md w-full p-8 text-center">
+            <div className="w-16 h-16 bg-[#E60012]/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Wrench className="w-8 h-8 text-[#E60012]" />
+            </div>
+            <h1 className="text-3xl font-extrabold text-gray-900 mb-3">404</h1>
+            <p className="text-gray-600 mb-8 font-medium">Page not found</p>
+            <Link href="/">
+              <span className="w-full cursor-pointer bg-[#E60012] hover:bg-[#CC0010] text-white py-3 px-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-colors shadow-lg">
+                Go to Dashboard
+              </span>
+            </Link>
           </div>
         </div>
       </Route>
@@ -80,7 +90,9 @@ function App() {
         <TooltipProvider>
           <ToastProvider>
             <Toaster />
-            <Router />
+            <ErrorBoundary>
+              <Router />
+            </ErrorBoundary>
           </ToastProvider>
         </TooltipProvider>
       </AuthProvider>

@@ -103,5 +103,35 @@ export const payrollController = {
             console.error(err);
             res.status(500).json({ message: "Failed to process payrolls" });
         }
+    },
+
+    update: async (req: Request, res: Response) => {
+        try {
+            const id = parseInt(req.params.id);
+            if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
+
+            const { baseSalary, overtime, allowances, deductions, notes } = req.body;
+            
+            // Calculate new netSalary based on inputs
+            const newNetSalary = (Number(baseSalary) || 0) + (Number(overtime) || 0) + (Number(allowances) || 0) - (Number(deductions) || 0);
+
+            const updated = await storage.updatePayroll(id, {
+                baseSalary: Number(baseSalary) || 0,
+                overtime: Number(overtime) || 0,
+                allowances: Number(allowances) || 0,
+                deductions: Number(deductions) || 0,
+                netSalary: newNetSalary,
+                notes: notes || null
+            });
+
+            if (!updated) {
+                return res.status(404).json({ message: "Payroll record not found" });
+            }
+
+            res.json(updated);
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ message: "Failed to update payroll" });
+        }
     }
 };

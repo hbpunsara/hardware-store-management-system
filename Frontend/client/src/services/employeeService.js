@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 export const employeeService = {
   async getAll() {
     const response = await fetch("/api/employees");
@@ -23,6 +24,14 @@ export const employeeService = {
     });
     if (!response.ok) throw new Error("Failed to update employee");
     return response.json();
+  },
+
+  async delete(id) {
+    const response = await fetch(`/api/employees/${id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) throw new Error("Failed to delete employee");
+    return true;
   },
 };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "../../components/Button";
 import { Modal, ConfirmDialog } from "../../components/Modal";
 import { useToast } from "../../components/Toast";
@@ -13,6 +13,7 @@ export const ProductsTab = () => {
     const [products, setProducts] = useState([]);
     const [suppliersList, setSuppliersList] = useState([]);
     const [loading, setLoading] = useState(true);
+    const searchInputRef = useRef(null);
     const [showAddModal, setShowAddModal] = useState(false);
     const [showEditModal, setShowEditModal] = useState(false);
     const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -161,6 +162,36 @@ export const ProductsTab = () => {
         outOfStock: products.filter(p => p.stock === 0).length
     };
 
+    // Keyboard Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+            switch (e.key) {
+                case "F2":
+                    e.preventDefault();
+                    resetForm();
+                    setShowAddModal(true);
+                    break;
+                case "F3":
+                    e.preventDefault();
+                    if (searchInputRef.current) searchInputRef.current.focus();
+                    break;
+                case "Escape":
+                    setShowAddModal(false);
+                    setShowEditModal(false);
+                    setShowDeleteDialog(false);
+                    setShowFilterModal(false);
+                    break;
+                default:
+                    break;
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    });
+
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
@@ -168,8 +199,9 @@ export const ProductsTab = () => {
                     <div className="relative">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                         <input
+                            ref={searchInputRef}
                             type="text"
-                            placeholder="Search products..."
+                            placeholder="Search products... (F3)"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="nintendo-input pl-12 w-80"
@@ -190,7 +222,7 @@ export const ProductsTab = () => {
                     </select>
                 </div>
                 <Button onClick={() => { resetForm(); setShowAddModal(true); }}>
-                    <Plus className="w-4 h-4 mr-2" /> Add Product
+                    <Plus className="w-4 h-4 mr-2" /> Add Product (F2)
                 </Button>
             </div>
 

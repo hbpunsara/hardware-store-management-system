@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 import { apiRequest } from "../lib/queryClient";
 
 const purchaseOrdersService = {

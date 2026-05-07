@@ -62,6 +62,64 @@ export const productController = {
     }
   },
 
+  createBulk: async (req: Request, res: Response) => {
+    try {
+      const productsArray = req.body.products;
+      if (!Array.isArray(productsArray) || productsArray.length === 0) {
+        return res.status(400).json({ message: "Invalid payload: 'products' array is required" });
+      }
+
+      const results = { successful: 0, failed: 0, errors: [] as any[] };
+      const createdProducts = [];
+
+      // Process sequentially to easily catch individual row errors without failing the entire batch
+      for (let i = 0; i < productsArray.length; i++) {
+        const item = productsArray[i];
+        try {
+          if (!item.sku || !item.name || !item.category || item.price == null) {
+            throw new Error(`Row ${i + 1} Missing required fields: sku, name, category, price`);
+          }
+
+          const priceNum = Number(item.price);
+          if (Number.isNaN(priceNum) || priceNum < 0) {
+             throw new Error(`Row ${i + 1} Price must be a valid positive number`);
+          }
+
+          const insertData = {
+            sku: String(item.sku).trim(),
+            name: String(item.name).trim(),
+            category: String(item.category),
+            price: priceNum,
+            costPrice: Number(item.costPrice) || 0,
+            stock: Number(item.stock) || 0,
+            supplier: item.supplier ? String(item.supplier) : null,
+          };
+
+          const row = await storage.createProduct(insertData);
+          createdProducts.push(toProductRow(row));
+          results.successful++;
+        } catch (err: any) {
+          results.failed++;
+          results.errors.push({
+            row: i + 1,
+            sku: item.sku || 'Unknown',
+            error: err.code === "23505" ? "A product with this SKU already exists" : err.message || "Failed to create"
+          });
+        }
+      }
+
+      res.status(201).json({
+        message: `Processed ${productsArray.length} products. ${results.successful} inserted, ${results.failed} failed.`,
+        results,
+        products: createdProducts
+      });
+
+    } catch (err: unknown) {
+      console.error("Create bulk products error:", err);
+      res.status(500).json({ message: "Failed to process bulk import" });
+    }
+  },
+
   update: async (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
     if (Number.isNaN(id)) {

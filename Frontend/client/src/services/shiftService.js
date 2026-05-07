@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 export const shiftService = {
     getActiveShift: async () => {
         try {

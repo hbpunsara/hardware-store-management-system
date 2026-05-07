@@ -16,6 +16,12 @@ import {
   Calendar,
   Save
 } from "lucide-react";
+import {
+  AreaChart, Area,
+  BarChart, Bar,
+  PieChart, Pie, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from "recharts";
 import { transactionService } from "../services/transactionService";
 import { reportsService } from "../services/reportsService";
 
@@ -118,6 +124,47 @@ export const Finance = () => {
 
   const profitMargin = totalIncome > 0 ? Math.round((netProfit / totalIncome) * 100) : 0;
 
+  // ── 6-month cash flow data for AreaChart ──────────────────────────────────
+  const cashFlowData = (() => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+      const ym = d.toISOString().slice(0, 7); // "YYYY-MM"
+      const monthLabel = d.toLocaleString("default", { month: "short" });
+      const income = transactions
+        .filter(t => t.type === "income" && (t.date || "").startsWith(ym))
+        .reduce((s, t) => s + Number(t.amount), 0);
+      const expense = transactions
+        .filter(t => t.type === "expense" && (t.date || "").startsWith(ym))
+        .reduce((s, t) => s + Number(t.amount), 0);
+      return { month: monthLabel, income, expense };
+    });
+  })();
+
+  // ── Pie data from expense categories ─────────────────────────────────────
+  const PIE_COLORS = ["#E60012", "#0AB5CD", "#7AC143", "#F5A623", "#9B59B6", "#1ABC9C"];
+  const pieChartData = expenseCategories.map((cat, i) => ({
+    name: cat.name,
+    value: cat.amount,
+    percentage: cat.percentage,
+    fill: PIE_COLORS[i % PIE_COLORS.length],
+  }));
+
+  // ── Shared tooltip ────────────────────────────────────────────────────────
+  const ChartTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div style={{ background: "white", border: "1px solid #eee", borderRadius: 10, padding: "8px 14px", fontSize: 13 }}>
+        {label && <p style={{ fontWeight: 700, color: "#374151", marginBottom: 4 }}>{label}</p>}
+        {payload.map((p, i) => (
+          <p key={i} style={{ color: p.color || p.fill, fontWeight: 600 }}>
+            {p.name}: LKR {Number(p.value).toLocaleString()}
+          </p>
+        ))}
+      </div>
+    );
+  };
+
   const financeStats = [
     { label: "Total Revenue", value: `LKR ${formatCurrency(totalIncome)}`, change: totalIncome > 0 ? `+${profitMargin}%` : "—", trend: "up", icon: TrendingUp, color: "bg-[#7AC143]" },
     { label: "Total Expenses", value: `LKR ${formatCurrency(totalExpense)}`, change: totalExpense > 0 ? `${Math.round((totalExpense / Math.max(totalIncome, 1)) * 100)}%` : "—", trend: "down", icon: TrendingDown, color: "bg-[#E60012]" },
@@ -195,6 +242,38 @@ export const Finance = () => {
             })}
           </div>
 
+          {/* ── 6-Month Cash Flow Area Chart ────────────────────────────── */}
+          <div className="nintendo-card p-6">
+            <div className="mb-5">
+              <h3 className="font-bold text-xl text-gray-900">Monthly Cash Flow</h3>
+              <p className="text-sm text-gray-400 mt-0.5">Income vs Expenses — past 6 months</p>
+            </div>
+            <ResponsiveContainer width="100%" height={240}>
+              <AreaChart data={cashFlowData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#7AC143" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#7AC143" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#E60012" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#E60012" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="month" tick={{ fontSize: 12, fontWeight: 600, fill: "#6B7280" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52}
+                  tickFormatter={v => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+                <Tooltip content={<ChartTooltip />} />
+                <Legend formatter={v => <span style={{ fontSize: 12, color: "#6B7280", fontWeight: 500 }}>{v}</span>} />
+                <Area type="monotone" dataKey="income" name="Income" stroke="#7AC143" strokeWidth={2.5}
+                  fill="url(#incomeGrad)" dot={{ r: 4, fill: "#7AC143" }} activeDot={{ r: 6 }} />
+                <Area type="monotone" dataKey="expense" name="Expense" stroke="#E60012" strokeWidth={2.5}
+                  fill="url(#expenseGrad)" dot={{ r: 4, fill: "#E60012" }} activeDot={{ r: 6 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
           <div className="grid grid-cols-3 gap-6">
             <div className="col-span-2">
               <div className="nintendo-card overflow-hidden">
@@ -263,26 +342,44 @@ export const Finance = () => {
 
             <div className="space-y-6">
               <div className="nintendo-card p-6">
-                <h4 className="font-bold text-lg text-gray-900 mb-4">Expense Breakdown</h4>
-                <div className="space-y-4">
-                  {expenseCategories.length === 0 ? (
-                    <p className="text-gray-500 text-sm">No expenses recorded yet</p>
-                  ) : expenseCategories.map((cat, i) => (
-                    <div key={i}>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-600">{cat.name}</span>
-                        <span className="text-sm font-bold text-gray-900">{cat.percentage}%</span>
-                      </div>
-                      <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${cat.color} rounded-full transition-all duration-500`}
-                          style={{ width: `${cat.percentage}%` }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">LKR {formatCurrency(cat.amount)}</p>
-                    </div>
-                  ))}
+                <div className="mb-3">
+                  <h4 className="font-bold text-lg text-gray-900">Expense Breakdown</h4>
+                  <p className="text-xs text-gray-400 mt-0.5">By category</p>
                 </div>
+                {expenseCategories.length === 0 ? (
+                  <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
+                    No expenses recorded yet
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={pieChartData}
+                        cx="50%" cy="44%"
+                        innerRadius={48} outerRadius={78}
+                        paddingAngle={3}
+                        dataKey="value"
+                        nameKey="name"
+                        stroke="none"
+                      >
+                        {pieChartData.map((entry, i) => (
+                          <Cell key={i} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(val, name, props) => [
+                          `LKR ${Number(val).toLocaleString()} (${props.payload.percentage}%)`,
+                          name,
+                        ]}
+                        contentStyle={{ borderRadius: 10, fontSize: 13, border: "1px solid #eee" }}
+                      />
+                      <Legend
+                        iconType="circle" iconSize={8}
+                        formatter={v => <span style={{ fontSize: 11, color: "#6B7280", fontWeight: 500 }}>{v}</span>}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </div>
 
               <div className="nintendo-card p-6">
@@ -308,27 +405,28 @@ export const Finance = () => {
               </div>
 
               <div className="nintendo-card p-6">
-                <h4 className="font-bold text-lg text-gray-900 mb-4">7-Day Revenue</h4>
-                <div className="flex items-end justify-between gap-2 h-32">
-                  {weeklyTrend.length === 0 ? (
-                    <p className="text-gray-500 text-sm w-full text-center py-4">No sales data yet</p>
-                  ) : weeklyTrend.map((d, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                      <div
-                        className="w-full bg-gradient-to-t from-[#7AC143] to-[#a8e063] rounded-t transition-all duration-500"
-                        style={{ height: `${d.heightPct || 5}%` }}
-                        title={`LKR ${formatCurrency(d.revenue)}`}
-                      />
-                      <span className="text-xs font-medium text-gray-500">{d.day}</span>
-                    </div>
-                  ))}
+                <div className="mb-3">
+                  <h4 className="font-bold text-lg text-gray-900">7-Day Revenue</h4>
+                  <p className="text-xs text-gray-400 mt-0.5">Daily sales this week</p>
                 </div>
-                <div className="flex justify-center gap-6 mt-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-[#7AC143] rounded" />
-                    <span className="text-xs text-gray-600">Daily Revenue (this week)</span>
+                {weeklyTrend.length === 0 ? (
+                  <div className="h-32 flex items-center justify-center text-gray-400 text-sm">
+                    No sales data yet
                   </div>
-                </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={130}>
+                    <BarChart data={weeklyTrend} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="25%">
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <XAxis dataKey="day" tick={{ fontSize: 11, fill: "#6B7280" }} axisLine={false} tickLine={false} />
+                      <YAxis hide />
+                      <Tooltip
+                        formatter={val => [`LKR ${Number(val).toLocaleString()}`, "Revenue"]}
+                        contentStyle={{ borderRadius: 10, fontSize: 12, border: "1px solid #eee" }}
+                      />
+                      <Bar dataKey="revenue" fill="#7AC143" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
           </div>

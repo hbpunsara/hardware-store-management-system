@@ -16,8 +16,12 @@ import {
   LogOut,
   Timer,
   TrendingUp,
-  Save
+  Save,
+  Trash2
 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+} from "recharts";
 import { employeeService } from "../services/employeeService";
 
 const roles = ["Cashier", "Stock Manager", "Supervisor", "Accountant", "Sales Associate"];
@@ -30,6 +34,8 @@ export const Employees = () => {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [quickCheckId, setQuickCheckId] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("All");
   const [formData, setFormData] = useState({
     name: "",
     role: "Cashier",
@@ -124,6 +130,19 @@ export const Employees = () => {
     }
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    try {
+      await employeeService.delete(deleteTarget.id);
+      await fetchEmployees();
+      toast.success(`${deleteTarget.name} deleted successfully.`);
+    } catch {
+      toast.error("Failed to delete employee");
+    } finally {
+      setDeleteTarget(null);
+    }
+  };
+
   const attendanceStats = [
     { label: "Present Today", value: employees.filter(e => e.status === "Present").length.toString(), total: employees.length.toString(), icon: CheckCircle, color: "bg-[#7AC143]" },
     { label: "Absent", value: employees.filter(e => e.status === "Absent").length.toString(), total: employees.length.toString(), icon: XCircle, color: "bg-[#E60012]" },
@@ -141,10 +160,30 @@ export const Employees = () => {
     .map(e => ({ name: e.name, action: e.checkOut && e.checkOut !== "-" ? "Checked Out" : "Checked In", time: e.checkIn, type: e.checkOut && e.checkOut !== "-" ? "out" : "in" }))
     .slice(0, 5);
 
-  const filteredEmployees = employees.filter(e =>
-    e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    e.role.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEmployees = employees.filter(e => {
+    const matchesSearch =
+      e.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.role.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus =
+      statusFilter === "All" ||
+      (statusFilter === "Active" && e.status === "Present") ||
+      (statusFilter === "Inactive" && (e.status === "Absent" || e.status === "On Leave"));
+    return matchesSearch && matchesStatus;
+  });
+
+  // Build chart data: parse "Xh Ym" hours string → decimal hours
+  const parseHours = (hoursStr) => {
+    if (!hoursStr || hoursStr === "-") return 0;
+    const hMatch = hoursStr.match(/(\d+)h/);
+    const mMatch = hoursStr.match(/(\d+)m/);
+    return (hMatch ? parseInt(hMatch[1]) : 0) + (mMatch ? parseInt(mMatch[1]) / 60 : 0);
+  };
+
+  const chartData = employees.map(e => ({
+    name: e.name.split(" ")[0],
+    hours: parseFloat(parseHours(e.hours).toFixed(2)),
+    status: e.status,
+  }));
 
   return (
     <div className="flex min-h-screen bg-[#F5F5F5]">
@@ -226,7 +265,17 @@ export const Employees = () => {
               <div className="nintendo-card overflow-hidden">
                 <div className="p-5 border-b border-gray-100 flex items-center justify-between">
                   <h3 className="font-bold text-xl text-gray-900">Employee Status</h3>
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 items-center">
+                    {/* Status filter */}
+                    <select
+                      value={statusFilter}
+                      onChange={e => setStatusFilter(e.target.value)}
+                      className="nintendo-input py-2 pr-8 text-sm font-semibold"
+                    >
+                      <option value="All">All</option>
+                      <option value="Active">Active (Present)</option>
+                      <option value="Inactive">Inactive (Absent/Leave)</option>
+                    </select>
                     <div className="relative">
                       <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                       <input
@@ -234,12 +283,9 @@ export const Employees = () => {
                         placeholder="Search employees..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="nintendo-input pl-12 w-64 py-2"
+                        className="nintendo-input pl-12 w-56 py-2"
                       />
                     </div>
-                    <Button variant="secondary" size="sm" onClick={() => toast.info("Filter options coming soon!")}>
-                      <Filter className="w-4 h-4 mr-2" /> Filter
-                    </Button>
                   </div>
                 </div>
                 <table className="nintendo-table">
@@ -295,6 +341,14 @@ export const Employees = () => {
                                 <LogIn className="w-4 h-4 mr-1" /> Check In
                               </Button>
                             ) : null}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setDeleteTarget(emp)}
+                              className="text-red-500 hover:text-red-700 hover:border-red-300"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
                           </div>
                         </td>
                       </tr>
@@ -374,6 +428,70 @@ export const Employees = () => {
               </div>
             </div>
           </div>
+
+          {/* ── Attendance Overview Bar Chart ────────────────────────────── */}
+          <div className="nintendo-card p-6">
+            <div className="mb-5">
+              <h3 className="font-bold text-xl text-gray-900">Attendance Overview</h3>
+              <p className="text-sm text-gray-400 mt-0.5">Hours worked today per employee</p>
+            </div>
+            {employees.length === 0 ? (
+              <div className="h-48 flex items-center justify-center text-gray-400 text-sm">
+                No employee data yet.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+                  barCategoryGap="25%"
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 12, fontWeight: 600, fill: "#6B7280" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "#9CA3AF" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                    label={{ value: "Hours", angle: -90, position: "insideLeft", offset: 8, style: { fontSize: 11, fill: "#9CA3AF" } }}
+                  />
+                  <Tooltip
+                    formatter={(val, _name, props) => [
+                      `${val}h`,
+                      props.payload.status,
+                    ]}
+                    labelFormatter={label => `Employee: ${label}`}
+                    contentStyle={{ borderRadius: 10, fontSize: 13, border: "1px solid #eee" }}
+                  />
+                  <Bar dataKey="hours" name="Hours Worked" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                    {chartData.map((entry, index) => (
+                      <Cell
+                        key={index}
+                        fill={
+                          entry.status === "Present" ? "#7AC143"
+                          : entry.status === "On Leave" ? "#F5A623"
+                          : "#E60012"
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+            <div className="flex items-center gap-6 mt-3 justify-center">
+              {[["#7AC143","Present"],["#F5A623","On Leave"],["#E60012","Absent"]].map(([color, label]) => (
+                <div key={label} className="flex items-center gap-2 text-xs text-gray-500 font-medium">
+                  <span className="w-3 h-3 rounded-full" style={{ background: color }} />
+                  {label}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add New Employee">
@@ -416,6 +534,31 @@ export const Employees = () => {
               <Button variant="secondary" onClick={() => setShowAddModal(false)}>Cancel</Button>
               <Button onClick={handleAddEmployee}>
                 <Save className="w-4 h-4 mr-2" /> Add Employee
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Delete confirmation modal */}
+        <Modal
+          isOpen={!!deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          title="Delete Employee"
+          size="sm"
+        >
+          <div className="space-y-4">
+            <p className="text-gray-600">
+              Are you sure you want to permanently delete{" "}
+              <span className="font-bold text-gray-900">{deleteTarget?.name}</span>?{" "}
+              This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end pt-2">
+              <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+              <Button
+                onClick={handleDeleteConfirm}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Trash2 className="w-4 h-4 mr-2" /> Delete
               </Button>
             </div>
           </div>

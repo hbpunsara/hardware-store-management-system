@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 export const authService = {
   async login(credentials) {
     const response = await fetch("/api/auth/login", {

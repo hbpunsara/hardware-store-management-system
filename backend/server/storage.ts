@@ -55,6 +55,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
 
   getAllProducts(): Promise<Product[]>;
@@ -76,6 +77,7 @@ export interface IStorage {
   getAllEmployees(): Promise<Employee[]>;
   createEmployee(data: InsertEmployee): Promise<Employee>;
   updateEmployee(id: number, data: Partial<InsertEmployee>): Promise<Employee | undefined>;
+  deleteEmployee(id: number): Promise<boolean>;
 
   getAllTransactions(): Promise<Transaction[]>;
   createTransaction(data: InsertTransaction): Promise<Transaction>;
@@ -158,6 +160,16 @@ export class DatabaseStorage implements IStorage {
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     if (user) await this.pushToSyncQueue('users', 'INSERT', user.id, user);
+    return user;
+  }
+
+  async updateUser(id: string, updateData: Partial<InsertUser>): Promise<User | undefined> {
+    const [user] = await db
+      .update(users)
+      .set({ ...updateData, isSynced: false, updatedAt: new Date().toISOString() })
+      .where(eq(users.id, id))
+      .returning();
+    if (user) await this.pushToSyncQueue('users', 'UPDATE', user.id, user);
     return user;
   }
 
@@ -324,6 +336,12 @@ export class DatabaseStorage implements IStorage {
       .returning();
     if (emp) await this.pushToSyncQueue('employees', 'UPDATE', emp.id, emp);
     return emp;
+  }
+
+  async deleteEmployee(id: number): Promise<boolean> {
+    const [deleted] = await db.delete(employees).where(eq(employees.id, id)).returning();
+    if (deleted) await this.pushToSyncQueue('employees', 'DELETE', id, { id });
+    return !!deleted;
   }
 
   async getAllTransactions(): Promise<Transaction[]> {
@@ -605,7 +623,6 @@ export class DatabaseStorage implements IStorage {
         payload: JSON.stringify(adj),
       });
 
-      return adj;
       return adj;
     });
   }

@@ -10,11 +10,11 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5000
-      - NODE_TLS_REJECT_UNAUTHORIZED=0
-      # This reads the Supabase DATABASE_URL from your .env file
       - DATABASE_URL=${DATABASE_URL}
     volumes:
-      - app-data:/app/backend
+      - backend-data:/app/backups
+      - backend-uploads:/app/public/uploads
+      - .:/app-host # Optional: mount host for easier debugging if needed, but not for prod
 
   frontend:
     build:
@@ -24,24 +24,10 @@ services:
       - "80:80"
     depends_on:
       - backend
-  # ml-service:
-  #   build:
-  #     context: ./ml-service
-  #     dockerfile: ../docker/ml-service/Dockerfile
-  #   ports:
-  #     - "5001:5001"
-  #   volumes:
-  #     - app-data:/app/backend
-  #   environment:
-  #     - DATABASE_URL=${DATABASE_URL}
-
-  electron-app:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    shm_size: 2gb
-    depends_on:
-      - frontend
+    environment:
+      - VITE_API_URL=/api
 
 volumes:
-  app-data:
+  backend-data:
+  backend-uploads:
+

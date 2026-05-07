@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 export const returnsService = {
     async getBySaleId(saleId) {
         const response = await fetch(`/api/returns/sale/${saleId}`);

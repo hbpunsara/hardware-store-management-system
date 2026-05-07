@@ -65,17 +65,39 @@ export const usersController = {
     }
   },
 
-  updateStatus: async (req: Request, res: Response) => {
+  update: async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
-      const { status } = req.body;
-      if (!status || !["Active", "Inactive"].includes(status)) {
-        return res.status(400).json({ message: "Status must be 'Active' or 'Inactive'" });
+      const { status, name, email, role, password } = req.body;
+      
+      const updateData: any = {};
+      if (name) updateData.name = String(name).trim();
+      if (email) updateData.email = String(email).trim();
+      if (role) updateData.role = String(role).toLowerCase();
+      if (password) updateData.password = String(password);
+
+      let userRow;
+      if (Object.keys(updateData).length > 0) {
+        userRow = await storage.updateUser(id, updateData);
+        if (!userRow) {
+          return res.status(404).json({ message: "User not found" });
+        }
       }
-      userStatusOverrides[id] = status;
-      res.json({ id, status, message: `User status updated to ${status}` });
-    } catch (err) {
-      res.status(500).json({ message: "Failed to update user status" });
+
+      if (status) {
+        if (!["Active", "Inactive"].includes(status)) {
+          return res.status(400).json({ message: "Status must be 'Active' or 'Inactive'" });
+        }
+        userStatusOverrides[id] = status;
+      }
+      
+      const user = userRow ? toUserRow(userRow) : { id, message: "Updated" };
+      if (status) user.status = status;
+
+      res.json(user);
+    } catch (err: unknown) {
+      console.error("Update user error:", err);
+      res.status(500).json({ message: "Failed to update user" });
     }
   },
 };

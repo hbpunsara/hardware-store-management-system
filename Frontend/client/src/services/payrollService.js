@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 const API_URL = "/api";
 
 export const payrollService = {

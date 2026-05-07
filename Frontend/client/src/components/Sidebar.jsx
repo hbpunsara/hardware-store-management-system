@@ -18,7 +18,8 @@ import {
   Tag,
   Clock,
   Play,
-  Square
+  Square,
+  X
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Modal } from "./Modal";
@@ -50,6 +51,19 @@ export const Sidebar = () => {
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [shiftAmount, setShiftAmount] = useState("");
   const toast = useToast();
+
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    const handleToggle = () => setIsOpen(prev => !prev);
+    document.addEventListener('toggleSidebar', handleToggle);
+    return () => document.removeEventListener('toggleSidebar', handleToggle);
+  }, []);
+
+  useEffect(() => {
+    // Close sidebar on route change in mobile
+    setIsOpen(false);
+  }, [location]);
 
   useEffect(() => {
     if (user && ["admin", "cashier"].includes(user.role)) {
@@ -83,7 +97,7 @@ export const Sidebar = () => {
   };
 
   const NavItem = ({ item }) => {
-    const isActive = location === item.path;
+    const isActive = location === item.path || (item.path !== '/' && location.startsWith(item.path));
     const Icon = item.icon;
 
     return (
@@ -99,16 +113,31 @@ export const Sidebar = () => {
   };
 
   return (
-    <aside className="nintendo-sidebar flex flex-col w-[280px] min-h-screen">
-      <div className="flex items-center gap-3 p-6 border-b border-white/10">
-        <div className="w-12 h-12 bg-[#E60012] rounded-xl flex items-center justify-center shadow-lg">
-          <Wrench className="w-7 h-7 text-white" />
+    <>
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+      <aside className={`nintendo-sidebar flex flex-col w-[280px] min-h-screen fixed md:relative z-50 transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-[#E60012] rounded-xl flex items-center justify-center shadow-lg">
+              <Wrench className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-extrabold text-white">Hardware POS</h1>
+              <p className="text-xs text-gray-400 font-medium">Hybrid Management</p>
+            </div>
+          </div>
+          <button 
+            className="md:hidden text-gray-400 hover:text-white"
+            onClick={() => setIsOpen(false)}
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
-        <div>
-          <h1 className="text-xl font-extrabold text-white">Hardware POS</h1>
-          <p className="text-xs text-gray-400 font-medium">Hybrid Management System</p>
-        </div>
-      </div>
 
       <nav className="flex-1 p-4 overflow-y-auto">
         <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3 px-4">Main Menu</p>
@@ -205,6 +234,7 @@ export const Sidebar = () => {
         </div>
       </Modal>
     </aside>
+    </>
   );
 };
 

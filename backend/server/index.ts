@@ -9,6 +9,8 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+import path from "path";
+app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 
 app.use((req, res, next) => {
   const start = Date.now();

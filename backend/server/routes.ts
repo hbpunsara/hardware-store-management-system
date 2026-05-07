@@ -1,6 +1,26 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { exec } from "child_process";
+import { promisify } from "util";
+import fs from "fs";
+import path from "path";
+
+const execAsync = promisify(exec);
+
 import { productController } from "./controllers/product.controller";
+import multer from "multer";
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(process.cwd(), "public", "uploads");
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, "logo-" + Date.now() + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage: storage });
 import { salesController } from "./controllers/sales.controller";
 import { authController } from "./controllers/auth.controller";
 import { employeesController } from "./controllers/employees.controller";
@@ -22,17 +42,20 @@ import { pricingTiersController } from "./controllers/pricingTiers.controller";
 import { loyaltyController } from "./controllers/loyalty.controller";
 import { shiftsController } from "./controllers/shifts.controller";
 import { printerController } from "./controllers/printer.controller";
+import { notificationsController } from "./controllers/notifications.controller";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.post("/api/auth/login", authController.login);
   app.post("/api/auth/logout", authController.logout);
+  app.post("/api/auth/force-logout", authController.forceLogout);
   app.get("/api/auth/me", authController.me);
 
   // Product routes
   app.get("/api/products", productController.getAll);
   app.get("/api/products/search", productController.search);
   app.get("/api/products/:id", productController.getById);
+  app.post("/api/products/bulk", productController.createBulk);
   app.post("/api/products", productController.create);
   app.put("/api/products/:id", productController.update);
   app.delete("/api/products/:id", productController.delete);
@@ -58,6 +81,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/employees", employeesController.getAll);
   app.post("/api/employees", employeesController.create);
   app.put("/api/employees/:id", employeesController.update);
+  app.delete("/api/employees/:id", employeesController.delete);
 
   // Transactions (Finance) routes
   app.get("/api/transactions", transactionsController.getAll);
@@ -80,12 +104,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Users (Settings) routes
   app.get("/api/users", usersController.getAll);
   app.post("/api/users", usersController.create);
-  app.patch("/api/users/:id", usersController.updateStatus);
+  app.patch("/api/users/:id", usersController.update);
 
   // Payroll routes
   app.get("/api/payroll", payrollController.getAll);
   app.post("/api/payroll/calculate", payrollController.calculateAll);
   app.post("/api/payroll/process", payrollController.processAll);
+  app.put("/api/payroll/:id", payrollController.update);
 
   // Customers routes
   app.get("/api/customers", customersController.getAll);
@@ -147,25 +172,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // System routes
   app.get("/api/system/status", systemController.getStatus);
+  app.get("/api/system/backups", systemController.getBackups);
+  app.post("/api/system/backup", systemController.createBackup);
+  app.post("/api/system/upload-logo", upload.single("logo"), systemController.uploadLogo);
 
-  // ML Recommendations route
+  // Notifications routes
+  app.get("/api/notifications", notificationsController.getAll);
+  app.patch("/api/notifications/:id/read", notificationsController.markRead);
+  app.delete("/api/notifications", notificationsController.clearAll);
+
+  // ML Train endpoint
+  app.post("/api/ml/train", async (req, res) => {
+    try {
+      const marketBasketPath = path.join(process.cwd(), "ml_service", "market_basket.py");
+      const seasonalAnalysisPath = path.join(process.cwd(), "ml_service", "seasonal_analysis.py");
+      
+      // Use python or python3 based on environment, usually 'python' on windows but python3 is in the original code
+      await execAsync(`python "${marketBasketPath}" train`).catch(() => execAsync(`python3 "${marketBasketPath}" train`));
+      await execAsync(`python "${seasonalAnalysisPath}" train`).catch(() => execAsync(`python3 "${seasonalAnalysisPath}" train`));
+      
+      res.json({ success: true, message: "Training complete" });
+    } catch (error) {
+      console.error("ML Train Error:", error);
+      res.status(500).json({ error: "Failed to train ML models" });
+    }
+  });
+
+  // ML Recommendations route — uses RL agent (epsilon-greedy Q-table) on top of basket rules
   app.post("/api/recommendations", async (req, res) => {
     try {
-      const response = await fetch('http://localhost:5001/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(req.body)
-      });
-
-      if (!response.ok) {
-        throw new Error(`ML Service responded with ${response.status}`);
+      const items = req.body.items || [];
+      if (items.length === 0) {
+        return res.json({ recommendations: [] });
       }
 
-      const data = await response.json();
-      res.json(data);
+      const rlScriptPath = path.join(process.cwd(), "ml_service", "rl_recommender.py");
+      const cartArg = items.join(",");
+
+      let recommendations: string[] = [];
+
+      try {
+        // Try RL agent first (uses Q-table + market basket candidates)
+        const { stdout } = await execAsync(`python3 "${rlScriptPath}" recommend "${cartArg}"`);
+        const parsed = JSON.parse(stdout.trim());
+        recommendations = parsed.recommendations || [];
+      } catch (rlErr) {
+        // Fallback: static rules.json lookup
+        console.warn("RL agent unavailable, falling back to static rules:", (rlErr as any).message);
+        const rulesPath = path.join(process.cwd(), "ml_service", "rules.json");
+        try {
+          const fileContent = await fs.promises.readFile(rulesPath, "utf-8");
+          const rules = JSON.parse(fileContent);
+          const recs = new Set<string>();
+          const cartLower = items.map((i: string) => i.toLowerCase());
+          for (const rule of rules) {
+            const products = rule.products || [];
+            if (products.some((p: string) => cartLower.includes(p.toLowerCase()))) {
+              for (const product of products) {
+                if (!cartLower.includes(product.toLowerCase())) recs.add(product);
+              }
+            }
+          }
+          recommendations = Array.from(recs).slice(0, 3);
+        } catch {
+          recommendations = [];
+        }
+      }
+
+      res.json({ recommendations });
     } catch (error) {
       console.error("ML Recommendation Error:", error);
       res.status(500).json({ error: "Failed to fetch recommendations from ML service" });
+    }
+  });
+
+  // RL Feedback endpoint — called when user accepts or ignores a recommendation
+  // reward: 1 = product added to cart, 0 = ignored/dismissed
+  app.post("/api/recommendations/feedback", async (req, res) => {
+    try {
+      const { product, reward } = req.body;
+      if (!product || reward === undefined) {
+        return res.status(400).json({ error: "product and reward are required" });
+      }
+
+      const rlScriptPath = path.join(process.cwd(), "ml_service", "rl_recommender.py");
+      // Map boolean/number reward: positive interactions = +1, negative = -0.1
+      const rlReward = reward === 1 || reward === true ? 1 : -0.1;
+
+      try {
+        const { stdout } = await execAsync(
+          `python3 "${rlScriptPath}" feedback "${product.replace(/"/g, '\\"')}" ${rlReward}`
+        );
+        const result = JSON.parse(stdout.trim());
+        res.json({ success: true, ...result });
+      } catch (err) {
+        console.warn("RL feedback update failed:", (err as any).message);
+        // Non-critical — don't fail the request
+        res.json({ success: false, message: "RL update skipped (python unavailable)" });
+      }
+    } catch (error) {
+      console.error("RL Feedback Error:", error);
+      res.status(500).json({ error: "Failed to process feedback" });
+    }
+  });
+
+  // RL Q-Table inspection endpoint (admin/debug use)
+  app.get("/api/recommendations/qtable", async (req, res) => {
+    try {
+      const rlScriptPath = path.join(process.cwd(), "ml_service", "rl_recommender.py");
+      const { stdout } = await execAsync(`python3 "${rlScriptPath}" qtable`);
+      res.json(JSON.parse(stdout.trim()));
+    } catch {
+      res.json({});
     }
   });
 
@@ -173,3 +291,4 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   return httpServer;
 }
+

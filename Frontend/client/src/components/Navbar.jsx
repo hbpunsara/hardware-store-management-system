@@ -1,24 +1,49 @@
 import { useState, useEffect } from "react";
-import { Search, Bell, ChevronDown, Cloud, CloudOff, CheckCircle, AlertTriangle, Info } from "lucide-react";
+import { Search, Bell, ChevronDown, Cloud, CloudOff, CheckCircle, AlertTriangle, Info, Menu } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { notificationsService } from "../services/notificationsService";
 
 export const Navbar = ({ title, showSearch = false }) => {
   const [syncStatus, setSyncStatus] = useState({ online: true, pendingItems: 0 });
 
-  // Mock notifications
-  const [notifications, setNotifications] = useState([
-    { id: 1, title: 'Low Stock Alert', message: 'Hammer 16oz is running low (5 left)', time: '10 mins ago', type: 'warning' },
-    { id: 2, title: 'System Update', message: 'Application updated to v1.2 successfully', time: '1 hour ago', type: 'success' },
-    { id: 3, title: 'New Order', message: 'Large order #1024 received', time: '2 hours ago', type: 'info' }
-  ]);
+  // Live notifications
+  const [notifications, setNotifications] = useState([]);
 
-  const removeNotification = (id) => {
-    setNotifications(notifications.filter(n => n.id !== id));
+  const removeNotification = async (id) => {
+    try {
+      await notificationsService.markRead(id);
+      setNotifications(notifications.filter(n => n.id !== id));
+    } catch (err) {
+      console.error("Failed to dismiss notification", err);
+    }
   };
+
+  const markAllAsRead = async () => {
+    try {
+      await notificationsService.clearAll();
+      setNotifications([]);
+    } catch (err) {
+      console.error("Failed to clear notifications", err);
+    }
+  };
+
   useEffect(() => {
+    document.title = `${title} | Hardware Pro`;
+  }, [title]);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const data = await notificationsService.getAll();
+        setNotifications(data);
+      } catch (err) {
+        console.error("Failed to fetch notifications", err);
+      }
+    };
+
     const checkStatus = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/system/status");
+        const res = await fetch("/api/system/status");
         if (res.ok) {
           const data = await res.json();
           setSyncStatus({ online: data.online, pendingItems: data.pendingSyncItems });
@@ -31,16 +56,29 @@ export const Navbar = ({ title, showSearch = false }) => {
     };
 
     checkStatus();
-    const interval = setInterval(checkStatus, 5000);
+    fetchNotifications();
+    const interval = setInterval(() => {
+      checkStatus();
+      fetchNotifications();
+    }, 15000); // Check every 15 seconds
+    
     return () => clearInterval(interval);
   }, []);
 
   return (
     <header className="bg-white border-b-2 border-gray-100 px-6 py-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-extrabold text-gray-900">{title}</h2>
-          <p className="text-sm text-gray-500 font-medium">Welcome back! Here's what's happening today.</p>
+        <div className="flex items-center gap-4">
+          <button 
+            className="md:hidden p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors" 
+            onClick={() => document.dispatchEvent(new CustomEvent('toggleSidebar'))}
+          >
+            <Menu className="w-6 h-6 text-gray-700" />
+          </button>
+          <div>
+            <h2 className="text-2xl font-extrabold text-gray-900">{title}</h2>
+            <p className="text-sm text-gray-500 font-medium hidden sm:block">Welcome back! Here's what's happening today.</p>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
@@ -67,9 +105,9 @@ export const Navbar = ({ title, showSearch = false }) => {
             <PopoverTrigger asChild>
               <button className="relative p-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
                 <Bell className="w-5 h-5 text-gray-600" />
-                {notifications.length > 0 && (
+                {notifications.filter(n => !n.isRead).length > 0 && (
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#E60012] rounded-full flex items-center justify-center text-white text-xs font-bold">
-                    {notifications.length}
+                    {notifications.filter(n => !n.isRead).length}
                   </span>
                 )}
               </button>
@@ -79,7 +117,7 @@ export const Navbar = ({ title, showSearch = false }) => {
                 <h3 className="font-semibold text-gray-900">Notifications</h3>
                 {notifications.length > 0 && (
                   <button
-                    onClick={() => setNotifications([])}
+                    onClick={markAllAsRead}
                     className="text-xs text-blue-600 hover:text-blue-800 font-medium"
                   >
                     Mark all as read

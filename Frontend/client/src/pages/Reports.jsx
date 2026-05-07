@@ -17,8 +17,37 @@ import {
   ShoppingBag,
   ArrowRight,
   Lightbulb,
-  Clock
+  Clock,
+  Printer,
+  FileText
 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  LineChart, Line,
+  PieChart, Pie, Cell
+} from "recharts";
+
+const PIE_COLORS = ["#E60012", "#0AB5CD", "#7AC143", "#F5A623", "#9B59B6", "#1ABC9C"];
+
+const PRINT_STYLES = `@media print {
+  .no-print { display: none !important; }
+  body { background: white; }
+  main { margin: 0 !important; }
+}`;
+
+const ChartTooltip = ({ active, payload, label, isCurrency = true }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div style={{ background: "white", border: "1px solid #eee", borderRadius: 10, padding: "8px 14px", fontSize: 13 }}>
+      <p style={{ fontWeight: 700, color: "#374151", marginBottom: 4 }}>{label}</p>
+      {payload.map((p, i) => (
+        <p key={i} style={{ color: p.color, fontWeight: 600 }}>
+          {p.name}: {isCurrency ? `LKR ${Number(p.value).toLocaleString()}` : p.value}
+        </p>
+      ))}
+    </div>
+  );
+};
 import { reportsService } from "../services/reportsService";
 
 const ICON_MAP = {
@@ -42,6 +71,7 @@ export const Reports = () => {
   const [insights, setInsights] = useState([]);
   const [weeklyTrend, setWeeklyTrend] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [training, setTraining] = useState(false);
   const [showDateModal, setShowDateModal] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -98,6 +128,46 @@ export const Reports = () => {
     }
   };
 
+  const handleTrainML = async () => {
+    try {
+      setTraining(true);
+      toast.success("Training ML models. This may take a moment...");
+      await reportsService.trainML();
+      toast.success("ML Models trained successfully!");
+      const [forecast, basket] = await Promise.all([
+        reportsService.getForecasting().catch(() => []),
+        reportsService.getBasketAnalysis().catch(() => [])
+      ]);
+      setForecastData(forecast);
+      setBasketAnalysis(basket);
+    } catch (err) {
+      toast.error(err.message || "Failed to train ML models");
+    } finally {
+      setTraining(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    try {
+      const rows = ["Product,Units Sold,Revenue (LKR),Margin %"];
+      topProducts.forEach(p =>
+        rows.push(`"${p.name}",${p.sales},${(p.revenue ?? 0).toFixed(2)},${p.trend}`)
+      );
+      const blob = new Blob([rows.join("\n")], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `sales-report-${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("CSV exported!");
+    } catch {
+      toast.error("Failed to export CSV");
+    }
+  };
+
+  const handlePrint = () => window.print();
+
   const handleApplyDateRange = () => {
     if (!dateFrom || !dateTo) {
       toast.error("Please select both start and end dates");
@@ -126,6 +196,7 @@ export const Reports = () => {
 
   return (
     <div className="flex min-h-screen bg-[#F5F5F5]">
+      <style>{PRINT_STYLES}</style>
       <Sidebar />
       <main className="flex-1">
         <Navbar title="Reports & Analytics" />
@@ -133,7 +204,7 @@ export const Reports = () => {
         <div className="p-6 space-y-6">
           <div className="flex items-center justify-between">
             <div className="flex gap-2">
-              {["overview", "forecasting", "basket analysis", "insights"].map((tab) => (
+              {["overview", "seasonal analysis", "basket analysis", "insights"].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -146,9 +217,19 @@ export const Reports = () => {
                 </button>
               ))}
             </div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 no-print">
+              <Button variant="secondary" onClick={handleTrainML} disabled={training}>
+                <Brain className={`w-4 h-4 mr-2 ${training ? 'animate-pulse' : ''}`} /> 
+                {training ? 'Training...' : 'Retrain ML Models'}
+              </Button>
               <Button variant="secondary" onClick={() => setShowDateModal(true)}>
                 <Calendar className="w-4 h-4 mr-2" /> Date Range
+              </Button>
+              <Button variant="secondary" onClick={handleExportCSV}>
+                <FileText className="w-4 h-4 mr-2" /> Export CSV
+              </Button>
+              <Button variant="secondary" onClick={handlePrint}>
+                <Printer className="w-4 h-4 mr-2" /> Print Report
               </Button>
               <Button onClick={handleExportAll}>
                 <Download className="w-4 h-4 mr-2" /> Export All
@@ -199,8 +280,11 @@ export const Reports = () => {
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="nintendo-card p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="font-bold text-xl text-gray-900">Revenue Trend</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="font-bold text-xl text-gray-900">Revenue Trend</h3>
+                      <p className="text-xs text-gray-400 mt-0.5">Daily revenue — past 7 days</p>
+                    </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => setTrendPeriod("week")}
@@ -212,41 +296,57 @@ export const Reports = () => {
                       >Month</button>
                     </div>
                   </div>
-                  <div className="h-64 flex items-end justify-between gap-2 px-2">
-                    {getTrendData().length === 0 ? (
-                      loading ? (
-                        <p className="text-gray-400 text-sm w-full text-center">Loading...</p>
-                      ) : (
-                        <p className="text-gray-400 text-sm w-full text-center">No sales data yet</p>
-                      )
-                    ) : getTrendData().map((d, i) => (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                        <div
-                          className="w-full bg-gradient-to-t from-[#E60012] to-[#FF6B6B] rounded-t-lg transition-all duration-500"
-                          style={{ height: `${d.heightPct || 5}%` }}
-                          title={`LKR ${(d.revenue || 0).toLocaleString()}`}
-                        />
-                        <span className="text-xs font-semibold text-gray-500">{d.day}</span>
-                      </div>
-                    ))}
-                  </div>
+                  {getTrendData().length === 0 ? (
+                    <div className="h-64 flex items-center justify-center text-gray-400 text-sm">
+                      {loading ? "Loading…" : "No sales data yet"}
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={240}>
+                      <BarChart data={getTrendData()} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="30%">
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis dataKey="day" tick={{ fontSize: 12, fontWeight: 600, fill: "#6B7280" }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={48}
+                          tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                        <Tooltip content={<ChartTooltip isCurrency />} cursor={{ fill: "#fafafa" }} />
+                        <Legend formatter={v => <span style={{ fontSize: 12, color: "#6B7280" }}>{v}</span>} />
+                        <Bar dataKey="revenue" name="Revenue (LKR)" fill="#E60012" radius={[6,6,0,0]} maxBarSize={48} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
 
                 <div className="nintendo-card p-6">
-                  <h3 className="font-bold text-xl text-gray-900 mb-6">Sales by Category</h3>
+                  <div className="mb-2">
+                    <h3 className="font-bold text-xl text-gray-900">Sales by Category</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Revenue breakdown this month</p>
+                  </div>
                   {categoryData.length === 0 ? (
-                    <p className="text-gray-500 text-sm py-8 text-center">No category data yet. Make some sales to see breakdown.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {categoryData.map((cat, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <div className={`w-3 h-3 rounded-full ${cat.color || REPORT_COLORS[i % REPORT_COLORS.length]}`} />
-                          <span className="text-sm font-medium text-gray-700 flex-1">{cat.name}</span>
-                          <span className="text-sm font-bold text-gray-900">{cat.percentage}%</span>
-                          <span className="text-xs text-gray-500">LKR {(cat.amount ?? 0).toLocaleString()}</span>
-                        </div>
-                      ))}
+                    <div className="h-64 flex items-center justify-center text-gray-400 text-sm">
+                      {loading ? "Loading…" : "No category data yet"}
                     </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={240}>
+                      <PieChart>
+                        <Pie data={categoryData} cx="50%" cy="45%" innerRadius={55} outerRadius={85}
+                          paddingAngle={3} dataKey="amount" nameKey="name" stroke="none">
+                          {categoryData.map((_, i) => (
+                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={({ active, payload }) => {
+                          if (!active || !payload?.length) return null;
+                          const d = payload[0];
+                          return (
+                            <div style={{ background: "white", border: "1px solid #eee", borderRadius: 10, padding: "8px 14px", fontSize: 13 }}>
+                              <p style={{ fontWeight: 700, color: d.payload.fill }}>{d.name}</p>
+                              <p style={{ color: "#374151" }}>{d.payload.percentage}% · LKR {Number(d.value).toLocaleString()}</p>
+                            </div>
+                          );
+                        }} />
+                        <Legend iconType="circle" iconSize={9}
+                          formatter={v => <span style={{ fontSize: 12, color: "#6B7280", fontWeight: 500 }}>{v}</span>} />
+                      </PieChart>
+                    </ResponsiveContainer>
                   )}
                 </div>
 
@@ -298,7 +398,7 @@ export const Reports = () => {
             </>
           )}
 
-          {activeTab === "forecasting" && (
+          {activeTab === "seasonal analysis" && (
             <div className="space-y-6">
               <div className="nintendo-card p-6">
                 <div className="flex items-center justify-between mb-6">
@@ -307,7 +407,7 @@ export const Reports = () => {
                       <Brain className="w-6 h-6 text-[#9B59B6]" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-xl text-gray-900">Sales Forecasting</h3>
+                      <h3 className="font-bold text-xl text-gray-900">Seasonal Analysis (Sales Forecasting)</h3>
                       <p className="text-sm text-gray-500">AI-powered predictions based on historical data</p>
                     </div>
                   </div>
@@ -318,49 +418,27 @@ export const Reports = () => {
                   </div>
                 </div>
 
-                <div className="h-80 flex items-end justify-between gap-3 px-4 mb-4">
-                  {forecastData.map((data, i) => {
-                    const maxValue = 70000;
-                    const actualHeight = data.actual ? (data.actual / maxValue) * 100 : 0;
-                    const predictedHeight = data.predicted ? (data.predicted / maxValue) * 100 : 0;
-
-                    return (
-                      <div key={data.month} className="flex-1 flex flex-col items-center gap-2">
-                        <div className="w-full h-full flex items-end">
-                          {data.actual && (
-                            <div
-                              className="w-full bg-gradient-to-t from-[#E60012] to-[#FF6B6B] rounded-t-lg"
-                              style={{ height: `${actualHeight}%` }}
-                            />
-                          )}
-                          {data.predicted && (
-                            <div
-                              className="w-full bg-gradient-to-t from-[#9B59B6] to-[#C39BD3] rounded-t-lg border-2 border-dashed border-[#9B59B6]"
-                              style={{ height: `${predictedHeight}%` }}
-                            />
-                          )}
-                        </div>
-                        <div className="text-center">
-                          <span className="text-xs font-semibold text-gray-500">{data.month}</span>
-                          <p className="text-xs font-bold text-gray-900">
-                            {(((data.actual || data.predicted) || 0) / 1000).toFixed(0)}k
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="flex justify-center gap-8">
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-[#E60012] rounded" />
-                    <span className="text-sm font-medium text-gray-600">Actual Sales</span>
+                {forecastData.length === 0 ? (
+                  <div className="h-72 flex items-center justify-center text-gray-400 text-sm">
+                    {loading ? "Loading…" : "No forecast data"}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 bg-[#9B59B6] rounded border-2 border-dashed border-[#9B59B6]" />
-                    <span className="text-sm font-medium text-gray-600">Predicted Sales</span>
-                  </div>
-                </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={forecastData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                      <XAxis dataKey="month" tick={{ fontSize: 12, fontWeight: 600, fill: "#6B7280" }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={52}
+                        tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}
+                        label={{ value: "Revenue (LKR)", angle: -90, position: "insideLeft", offset: 10, style: { fontSize: 11, fill: "#9CA3AF" } }} />
+                      <Tooltip content={<ChartTooltip isCurrency />} />
+                      <Legend formatter={v => <span style={{ fontSize: 12, color: "#6B7280" }}>{v}</span>} />
+                      <Line type="monotone" dataKey="actual" name="Actual Sales" stroke="#E60012" strokeWidth={2.5}
+                        dot={{ r: 4, fill: "#E60012" }} activeDot={{ r: 6 }} connectNulls={false} />
+                      <Line type="monotone" dataKey="predicted" name="Predicted Sales" stroke="#9B59B6" strokeWidth={2.5}
+                        strokeDasharray="6 3" dot={{ r: 4, fill: "#9B59B6" }} activeDot={{ r: 6 }} connectNulls={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-5">
@@ -461,22 +539,30 @@ export const Reports = () => {
               <div className="nintendo-card p-6">
                 <h4 className="font-bold text-lg text-gray-900 mb-4">Bundling Recommendations</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-[#7AC143]/5 border-2 border-[#7AC143]/20 rounded-xl">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Lightbulb className="w-5 h-5 text-[#7AC143]" />
-                      <span className="font-bold text-gray-900">Tool Starter Kit</span>
+                  {basketAnalysis.length > 0 ? basketAnalysis.slice(0, 2).map((basket, i) => {
+                    const isFirst = i === 0;
+                    const bgColor = isFirst ? 'bg-[#7AC143]/5' : 'bg-[#0AB5CD]/5';
+                    const borderColor = isFirst ? 'border-[#7AC143]/20' : 'border-[#0AB5CD]/20';
+                    const textColor = isFirst ? 'text-[#7AC143]' : 'text-[#0AB5CD]';
+                    const title = isFirst ? "Top Recommendation" : "High Value Bundle";
+
+                    return (
+                      <div key={i} className={`p-4 ${bgColor} border-2 ${borderColor} rounded-xl`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Lightbulb className={`w-5 h-5 ${textColor}`} />
+                          <span className="font-bold text-gray-900">{title}</span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-3">Bundle: {basket.products.join(" + ")}</p>
+                        <p className={`text-sm font-bold ${textColor}`}>
+                          Pairs frequently ({basket.confidence} match)
+                        </p>
+                      </div>
+                    );
+                  }) : (
+                    <div className="col-span-2 text-center text-sm text-gray-500 py-4">
+                      No recommendations available yet. Data processing required.
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">Bundle Hammer + Screwdriver Set + Measuring Tape</p>
-                    <p className="text-sm font-bold text-[#7AC143]">Potential 15% increase in avg. order value</p>
-                  </div>
-                  <div className="p-4 bg-[#0AB5CD]/5 border-2 border-[#0AB5CD]/20 rounded-xl">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Lightbulb className="w-5 h-5 text-[#0AB5CD]" />
-                      <span className="font-bold text-gray-900">Painter's Bundle</span>
-                    </div>
-                    <p className="text-sm text-gray-600 mb-3">Bundle Brushes + Rollers + Tape + Drop Cloth</p>
-                    <p className="text-sm font-bold text-[#0AB5CD]">Potential 22% increase in paint category sales</p>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>

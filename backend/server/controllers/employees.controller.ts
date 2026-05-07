@@ -57,4 +57,16 @@ export const employeesController = {
     }
     res.json(toEmployeeRow(row));
   },
+
+  delete: async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10);
+    if (Number.isNaN(id)) {
+      return res.status(400).json({ message: "Invalid employee id" });
+    }
+    const deleted = await storage.deleteEmployee(id);
+    if (!deleted) {
+      return res.status(404).json({ message: "Employee not found" });
+    }
+    res.status(204).send();
+  },
 };

@@ -427,3 +427,18 @@ export const seasonalTrends = sqliteTable("seasonal_trends", {
 export const insertSeasonalTrendSchema = createInsertSchema(seasonalTrends);
 export type InsertSeasonalTrend = z.infer<typeof insertSeasonalTrendSchema>;
 export type SeasonalTrend = typeof seasonalTrends.$inferSelect;
+
+// Notifications
+export const notifications = sqliteTable("notifications", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").notNull().default("info"), // 'info', 'warning', 'success', 'error'
+  isRead: integer("is_read", { mode: 'boolean' }).default(false).notNull(),
+  createdAt: text("created_at").default(sql`(CURRENT_TIMESTAMP)`).notNull(),
+});
+
+export const insertNotificationSchema = createInsertSchema(notifications);
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
+

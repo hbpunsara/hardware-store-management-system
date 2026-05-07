@@ -4,7 +4,7 @@ import { Navbar } from "../components/Navbar";
 import { Button } from "../components/Button";
 import { Modal, ConfirmDialog } from "../components/Modal";
 import { useToast } from "../components/Toast";
-import { Search, Plus, Edit, Trash2, Package, AlertTriangle, Filter, Save } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Package, AlertTriangle, Filter, Save, Upload } from "lucide-react";
 import productService from "../services/productService";
 
 const categories = ["Tools", "Hardware", "Painting", "Adhesives", "Materials"];
@@ -20,6 +20,7 @@ export const Products = () => {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const fileInputRef = React.useRef(null);
   const [formData, setFormData] = useState({
     sku: "",
     name: "",
@@ -72,6 +73,69 @@ export const Products = () => {
       toast.success("Product added successfully!");
     } catch (err) {
       toast.error(err.message || "Failed to add product");
+    }
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      const text = await file.text();
+      const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+      
+      if (lines.length < 2) {
+        toast.error("CSV file is empty or missing headers");
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const productsArray = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const _row = lines[i];
+        // simple parsing assuming no commas inside the values for this basic CSV feature
+        const cols = _row.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        
+        const itemObj = {};
+        headers.forEach((header, index) => {
+          // Map standard formats to our schema
+          if (header.includes('sku')) itemObj.sku = cols[index];
+          else if (header.includes('name') || header.includes('product')) itemObj.name = cols[index];
+          else if (header.includes('category')) itemObj.category = cols[index] || "Hardware";
+          else if (header.includes('price') && !header.includes('cost')) itemObj.price = cols[index];
+          else if (header.includes('cost') || header.includes('costprice')) itemObj.costPrice = cols[index];
+          else if (header.includes('stock') || header.includes('qty')) itemObj.stock = cols[index];
+          else if (header.includes('supplier')) itemObj.supplier = cols[index];
+        });
+
+        if (itemObj.sku && itemObj.name && itemObj.price !== undefined) {
+           productsArray.push(itemObj);
+        }
+      }
+
+      if (productsArray.length === 0) {
+        toast.error("Could not parse any valid products from the CSV. Make sure you have at least SKU, Name, and Price columns.");
+        return;
+      }
+
+      const res = await productService.createBulk(productsArray);
+      
+      if (res.results && res.results.failed > 0) {
+        toast.error(`Import finished with issues: ${res.results.successful} imported, ${res.results.failed} failed.`);
+      } else {
+        toast.success(`Successfully imported ${productsArray.length} products!`);
+      }
+      
+      loadProducts();
+    } catch (err) {
+      toast.error(err.message || "Failed to parse or upload CSV file");
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""; // reset input
+      }
     }
   };
 
@@ -190,9 +254,21 @@ export const Products = () => {
                 ))}
               </select>
             </div>
-            <Button onClick={() => { resetForm(); setShowAddModal(true); }}>
-              <Plus className="w-4 h-4 mr-2" /> Add Product
-            </Button>
+            <div className="flex gap-3">
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                className="hidden" 
+                accept=".csv" 
+                onChange={handleFileUpload} 
+              />
+              <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-4 h-4 mr-2" /> Bulk Import
+              </Button>
+              <Button onClick={() => { resetForm(); setShowAddModal(true); }}>
+                <Plus className="w-4 h-4 mr-2" /> Add Product
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-4 gap-4 mb-6">

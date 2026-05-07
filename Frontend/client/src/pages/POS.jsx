@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Sidebar } from "../components/Sidebar";
 import { Navbar } from "../components/Navbar";
 import { Button } from "../components/Button";
@@ -15,6 +15,8 @@ import { redeemPoints } from "../services/loyaltyService";
 import { promotionsService } from "../services/promotionsService";
 
 export const POS = () => {
+  const searchInputRef = useRef(null);
+  const tenderInputRef = useRef(null);
   const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -28,6 +30,20 @@ export const POS = () => {
   const [tenderMethod, setTenderMethod] = useState("Cash");
   const [tenderAmountInput, setTenderAmountInput] = useState("");
 
+  // Focus the tender input exactly when the payment modal is opened
+  useEffect(() => {
+    if (showPaymentModal) {
+      // The Modal conditionally renders its children, so the input might take a tick to mount
+      const timer = setTimeout(() => {
+        if (tenderInputRef.current) {
+          tenderInputRef.current.focus();
+          tenderInputRef.current.select(); 
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [showPaymentModal]);
+
   const [discountValue, setDiscountValue] = useState(0);
   const [discountType, setDiscountType] = useState("%"); // "%" or "flat"
 
@@ -37,6 +53,7 @@ export const POS = () => {
   const [emailingInvoice, setEmailingInvoice] = useState(false);
   const [customerEmail, setCustomerEmail] = useState("");
   const [recommendations, setRecommendations] = useState([]);
+  const [shownRecommendations, setShownRecommendations] = useState([]);
   const [pricingTiers, setPricingTiers] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -85,7 +102,12 @@ export const POS = () => {
     load();
   }, []);
 
-  // Fetch ML recommendations whenever the cart changes
+  // Generate a comma-separated string of unique cart item IDs to track when to re-fetch
+  const cartItemIds = useMemo(() => {
+    return Array.from(new Set(cart.map(item => item.id))).sort().join(',');
+  }, [cart]);
+
+  // Fetch ML recommendations whenever the distinct items in cart changes
   useEffect(() => {
     const fetchRecommendations = async () => {
       if (cart.length === 0) {
@@ -93,11 +115,12 @@ export const POS = () => {
         return;
       }
       try {
-        const itemNames = cart.map(item => item.name);
+        // use distinct names for ML query
+        const uniqueNames = Array.from(new Set(cart.map(item => item.name)));
         const res = await fetch("/api/recommendations", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ items: itemNames })
+          body: JSON.stringify({ items: uniqueNames })
         });
         if (res.ok) {
           const data = await res.json();
@@ -106,6 +129,7 @@ export const POS = () => {
             .map(recName => products.find(p => p.name.toUpperCase() === recName.toUpperCase()))
             .filter(Boolean);
           setRecommendations(recommendedProducts);
+          setShownRecommendations(recommendedProducts);
         }
       } catch (err) {
         console.error("Failed to fetch recommendations:", err);
@@ -116,9 +140,19 @@ export const POS = () => {
     if (products.length > 0) {
       fetchRecommendations();
     }
-  }, [cart, products]);
+  }, [cartItemIds, products]);
 
-  const addToCart = (product) => {
+  // Send RL feedback — fire-and-forget (non-blocking)
+  const sendRLFeedback = (productName, reward) => {
+    fetch("/api/recommendations/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product: productName, reward }),
+    }).catch(() => {}); // silently ignore errors
+  };
+
+
+  const addToCart = (product, fromRecommendation = false) => {
     const existing = cart.find(item => item.id === product.id);
     if (existing) {
       setCart(cart.map(item =>
@@ -130,6 +164,14 @@ export const POS = () => {
       setCart([...cart, { ...product, quantity: 1 }]);
     }
     toast.success(`${product.name} added to cart`);
+    if (fromRecommendation) {
+      // Positive RL reward — user accepted the recommendation
+      sendRLFeedback(product.name, 1);
+      // Negative reward for the OTHER recommendations that were shown but not picked
+      shownRecommendations
+        .filter(r => r.id !== product.id)
+        .forEach(r => sendRLFeedback(r.name, 0));
+    }
   };
 
   const updateQuantity = (id, delta) => {
@@ -309,41 +351,56 @@ export const POS = () => {
     });
   };
 
-  let baseSubtotal = 0;
-  let seasonalDiscountTotal = 0;
+  const {
+    subtotal,
+    tax,
+    total,
+    discountTotal
+  } = useMemo(() => {
+    let baseSubtotal = 0;
+    let seasonalDiscountTotal = 0;
 
-  cart.forEach(item => {
-    const itemTotal = item.price * item.quantity;
-    baseSubtotal += itemTotal;
+    cart.forEach(item => {
+      const itemTotal = item.price * item.quantity;
+      baseSubtotal += itemTotal;
 
-    const promo = getItemPromo(item);
-    if (promo) {
-      const discountPerItem = promo.type === 'PERCENTAGE'
-        ? item.price * (promo.value / 100)
-        : promo.value;
-      seasonalDiscountTotal += discountPerItem * item.quantity;
-    }
-  });
+      const promo = getItemPromo(item);
+      if (promo) {
+        const discountPerItem = promo.type === 'PERCENTAGE'
+          ? item.price * (promo.value / 100)
+          : promo.value;
+        seasonalDiscountTotal += discountPerItem * item.quantity;
+      }
+    });
 
-  const subtotal = baseSubtotal;
-  const tierMultiplier = getTierMultiplier();
-  const tierDiscountAmount = subtotal * (1 - tierMultiplier);
-  const subtotalAfterTierAndSeasonal = Math.max(0, subtotal - tierDiscountAmount - seasonalDiscountTotal);
+    const tierMultiplier = getTierMultiplier();
+    const tierDiscountAmount = baseSubtotal * (1 - tierMultiplier);
+    const subtotalAfterTierAndSeasonal = Math.max(0, baseSubtotal - tierDiscountAmount - seasonalDiscountTotal);
 
-  const promoDiscount = discountType === "%" ? subtotalAfterTierAndSeasonal * (Number(discountValue) / 100) : Number(discountValue);
-  const pointsDiscount = pointsRedeemed * POINTS_VALUE_RATE;
+    const promoDiscount = discountType === "%" ? subtotalAfterTierAndSeasonal * (Number(discountValue) / 100) : Number(discountValue);
+    const pointsDiscount = pointsRedeemed * POINTS_VALUE_RATE;
 
-  const discountTotal = tierDiscountAmount + seasonalDiscountTotal + promoDiscount + pointsDiscount;
-  const discountedSubtotal = Math.max(0, subtotal - discountTotal);
+    const calcDiscountTotal = tierDiscountAmount + seasonalDiscountTotal + promoDiscount + pointsDiscount;
+    const discountedSubtotal = Math.max(0, baseSubtotal - calcDiscountTotal);
 
-  const tax = isTaxExempt ? 0 : discountedSubtotal * 0.09;
-  const total = discountedSubtotal + tax;
+    const calcTax = isTaxExempt ? 0 : discountedSubtotal * 0.09;
+    const calcTotal = discountedSubtotal + calcTax;
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+    return {
+      subtotal: baseSubtotal,
+      tax: calcTax,
+      total: calcTotal,
+      discountTotal: calcDiscountTotal
+    };
+  }, [cart, isTaxExempt, discountType, discountValue, pointsRedeemed, selectedCustomer, pricingTiers, activePromos]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = selectedCategory === "All" || p.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchTerm, selectedCategory]);
 
   const handleAddTender = () => {
     const amt = parseFloat(tenderAmountInput);
@@ -352,33 +409,31 @@ export const POS = () => {
       return;
     }
 
-    setTenders([...tenders, { method: tenderMethod, amount: amt }]);
+    const newTenders = [...tenders, { method: tenderMethod, amount: amt }];
+    setTenders(newTenders);
     setTenderAmountInput("");
+    
+    // Auto-complete if Enter was pressed and total is covered
+    const newTotalTendered = newTenders.reduce((sum, t) => sum + t.amount, 0);
+    if (Math.round(newTotalTendered * 100) / 100 >= Math.round(total * 100) / 100) {
+      // Need a tiny delay for React state (tenders) to update before processPayment reads it
+      // Standard practice: we pass the exact tenders to processPayment or let the effect handle it.
+      // Easiest is to process payment with the new Tenders directly.
+      processPaymentWithTenders(newTenders);
+    }
   };
 
-  const removeTender = (index) => {
-    setTenders(tenders.filter((_, i) => i !== index));
-  };
-
-  const totalTendered = tenders.reduce((sum, t) => sum + t.amount, 0);
-  const remainingBalance = Math.max(0, total - totalTendered);
-  const change = Math.max(0, totalTendered - total);
-
-  const handlePayment = () => {
-    setTenderMethod("Cash");
-    setTenders([]);
-    setTenderAmountInput(total.toFixed(2));
-    setShowPaymentModal(true);
-  };
-
-  const processPayment = async () => {
+  const processPaymentWithTenders = async (tendersToProcess) => {
     if (cart.length === 0) {
       toast.error("Cart is empty!");
       return;
     }
 
-    if (totalTendered < total) {
-      toast.error(`Insufficient funds. Remaining: LKR ${remainingBalance.toFixed(2)}`);
+    const currentTotalTendered = tendersToProcess.reduce((sum, t) => sum + t.amount, 0);
+    const currentRemainingBalance = Math.max(0, total - currentTotalTendered);
+
+    if (Math.round(currentTotalTendered * 100) / 100 < Math.round(total * 100) / 100) {
+      toast.error(`Insufficient funds. Remaining: LKR ${currentRemainingBalance.toFixed(2)}`);
       return;
     }
 
@@ -391,7 +446,7 @@ export const POS = () => {
         discount: discountType === "%" ? Number(discountValue) : 0,
         discountTotal,
         total,
-        paymentMethod: tenders, // Send as array, backend stringifies it
+        paymentMethod: tendersToProcess,
         cashierId: user?.id,
         customerId: selectedCustomer?.id,
       });
@@ -416,6 +471,35 @@ export const POS = () => {
       setProcessing(false);
     }
   };
+
+  const processPayment = async () => {
+    // If there is an unprocessed valid amount in the input, add it automatically
+    let currentTenders = [...tenders];
+    const amt = parseFloat(tenderAmountInput);
+    if (!isNaN(amt) && amt > 0) {
+      currentTenders.push({ method: tenderMethod, amount: amt });
+      setTenders(currentTenders);
+      setTenderAmountInput("");
+    }
+    await processPaymentWithTenders(currentTenders);
+  };
+
+  const removeTender = (index) => {
+    setTenders(tenders.filter((_, i) => i !== index));
+  };
+
+  const totalTendered = tenders.reduce((sum, t) => sum + t.amount, 0);
+  const remainingBalance = Math.max(0, total - totalTendered);
+  const change = Math.max(0, totalTendered - total);
+
+  const handlePayment = () => {
+    setTenderMethod("Cash");
+    setTenders([]);
+    setTenderAmountInput(total.toFixed(2));
+    setShowPaymentModal(true);
+  };
+
+  // processPayment is now defined above
 
   const handlePrintReceipt = async () => {
     try {
@@ -509,6 +593,57 @@ export const POS = () => {
     }
   };
 
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Don't intercept if modifying with Ctrl/Cmd/Alt
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      switch (e.key) {
+        case "F2":
+          e.preventDefault();
+          if (searchInputRef.current) searchInputRef.current.focus();
+          break;
+        case "F4":
+          e.preventDefault();
+          if (cart.length > 0) setShowParkModal(true);
+          break;
+        case "F5":
+          e.preventDefault();
+          openRecallModal();
+          break;
+        case "F7":
+          e.preventDefault();
+          setShowCustomItemModal(true);
+          break;
+        case "F9":
+          e.preventDefault();
+          if (cart.length > 0) {
+            setTenderMethod("Cash");
+            handlePayment();
+          }
+          break;
+        case "F10":
+          e.preventDefault();
+          handleSync();
+          break;
+        case "Escape":
+          setShowPaymentModal(false);
+          setShowReceiptModal(false);
+          setShowCustomerModal(false);
+          setShowParkModal(false);
+          setShowRecallModal(false);
+          setShowCustomItemModal(false);
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
   return (
     <div className="flex min-h-screen bg-[#F5F5F5]">
       <Sidebar />
@@ -569,8 +704,9 @@ export const POS = () => {
                   <div className="flex-1 relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
+                      ref={searchInputRef}
                       type="text"
-                      placeholder="Search products..."
+                      placeholder="Search products... (F2)"
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="nintendo-input pl-12"
@@ -594,7 +730,7 @@ export const POS = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="flex flex-col gap-2">
                 {productsLoading ? (
                   <div className="col-span-3 p-8 text-center text-gray-500">Loading products...</div>
                 ) : (
@@ -602,14 +738,13 @@ export const POS = () => {
                     <div
                       key={product.id}
                       onClick={() => addToCart(product)}
-                      className="nintendo-card p-4 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-200"
+                      className="nintendo-card p-3 cursor-pointer hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200 flex justify-between items-center"
                     >
-                      <div className="h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl mb-3 flex items-center justify-center">
-                        <span className="text-3xl">🔧</span>
+                      <div>
+                        <p className="font-bold text-gray-900 leading-tight">{product.name}</p>
+                        <p className="text-xs text-gray-500">{product.category}</p>
                       </div>
-                      <p className="font-bold text-gray-900 mb-1">{product.name}</p>
-                      <p className="text-xs text-gray-500 mb-2">{product.category}</p>
-                      <p className="text-lg font-extrabold text-[#E60012]">LKR {product.price?.toFixed(2)}</p>
+                      <p className="text-base font-extrabold text-[#E60012]">LKR {product.price?.toFixed(2)}</p>
                     </div>
                   ))
                 )}
@@ -661,9 +796,6 @@ export const POS = () => {
                   ) : (
                     cart.map(item => (
                       <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
-                        <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center text-lg">
-                          🔧
-                        </div>
                         <div className="flex-1">
                           <p className="font-bold text-sm text-gray-900 flex items-center gap-2">
                             {item.name}
@@ -815,18 +947,19 @@ export const POS = () => {
                 </div>
               </div>
 
-              {/* ML Recommendations Section */}
+              {/* ML Recommendations Section — RL-powered */}
               {recommendations.length > 0 && (
                 <div className="nintendo-card p-5 mt-5">
                   <div className="flex items-center gap-2 mb-4">
                     <span className="text-xl">✨</span>
                     <h3 className="font-bold text-lg text-gray-900">Suggested Add-ons</h3>
+                    <span className="text-xs text-gray-400 font-medium ml-auto">AI-powered</span>
                   </div>
                   <div className="space-y-3">
                     {recommendations.map(product => (
                       <div
                         key={`rec-${product.id}`}
-                        onClick={() => addToCart(product)}
+                        onClick={() => addToCart(product, true)}
                         className="flex items-center gap-3 p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl cursor-pointer hover:shadow-md transition-all border border-yellow-100"
                       >
                         <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-sm shadow-sm">
@@ -883,6 +1016,7 @@ export const POS = () => {
                 <input
                   type="number"
                   placeholder="Amount"
+                  ref={tenderInputRef}
                   className="w-32 nintendo-input font-bold"
                   value={tenderAmountInput}
                   onChange={(e) => setTenderAmountInput(e.target.value)}

@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 export const userService = {
   async getAll() {
     const response = await fetch("/api/users");
@@ -24,6 +25,13 @@ export const userService = {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || "Failed to update user");
+    return data;
+  },
+
+  async forceLogoutAll() {
+    const response = await fetch("/api/auth/force-logout", { method: "POST" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || "Failed to force logout");
     return data;
   },
 };

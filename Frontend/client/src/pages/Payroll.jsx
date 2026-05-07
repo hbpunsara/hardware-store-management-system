@@ -19,7 +19,9 @@ import {
   Eye,
   Printer,
   X,
-  Check
+  Check,
+  Edit,
+  Save
 } from "lucide-react";
 import payrollService from "../services/payrollService";
 
@@ -30,7 +32,16 @@ export const Payroll = () => {
   const [payrollData, setPayrollData] = useState([]);
   const [showPayslipModal, setShowPayslipModal] = useState(false);
   const [showCalculatorModal, setShowCalculatorModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedPayroll, setSelectedPayroll] = useState(null);
+  const [editData, setEditData] = useState({
+    baseSalary: 0,
+    overtime: 0,
+    allowances: 0,
+    deductions: 0,
+    notes: ""
+  });
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
@@ -78,6 +89,29 @@ export const Payroll = () => {
   const handleViewPayslip = (employee) => {
     setSelectedEmployee(employee);
     setShowPayslipModal(true);
+  };
+
+  const handleEditClick = (emp) => {
+    setSelectedPayroll(emp);
+    setEditData({
+      baseSalary: emp.baseSalary || 0,
+      overtime: emp.overtime || 0,
+      allowances: emp.allowances || 0,
+      deductions: emp.deductions || 0,
+      notes: emp.notes || ""
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    try {
+      await payrollService.update(selectedPayroll.id, editData);
+      toast.success("Payroll updated successfully");
+      setShowEditModal(false);
+      await loadPayrolls();
+    } catch (err) {
+      toast.error(err.message || "Failed to update payroll");
+    }
   };
 
   const handlePrintPayslip = (employee) => {
@@ -251,6 +285,13 @@ export const Payroll = () => {
                     <td>
                       <div className="flex gap-2">
                         <button
+                          onClick={() => handleEditClick(emp)}
+                          className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4 text-gray-600" />
+                        </button>
+                        <button
                           onClick={() => handleViewPayslip(emp)}
                           className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center hover:bg-gray-200 transition-colors"
                         >
@@ -389,6 +430,62 @@ export const Payroll = () => {
               </div>
             </div>
           )}
+        </Modal>
+
+        <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Payroll Record">
+          <div className="space-y-5">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Base Salary</label>
+              <input
+                type="number"
+                value={editData.baseSalary}
+                onChange={(e) => setEditData({ ...editData, baseSalary: Number(e.target.value) })}
+                className="nintendo-input"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Overtime</label>
+              <input
+                type="number"
+                value={editData.overtime}
+                onChange={(e) => setEditData({ ...editData, overtime: Number(e.target.value) })}
+                className="nintendo-input"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Allowances</label>
+              <input
+                type="number"
+                value={editData.allowances}
+                onChange={(e) => setEditData({ ...editData, allowances: Number(e.target.value) })}
+                className="nintendo-input"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Deductions</label>
+              <input
+                type="number"
+                value={editData.deductions}
+                onChange={(e) => setEditData({ ...editData, deductions: Number(e.target.value) })}
+                className="nintendo-input"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Notes</label>
+              <textarea
+                value={editData.notes}
+                onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                className="nintendo-input"
+                rows="2"
+              />
+            </div>
+            <div className="flex gap-3 justify-end pt-4 border-t border-gray-100">
+              <Button variant="secondary" onClick={() => setShowEditModal(false)}>Cancel</Button>
+              <Button onClick={handleSaveEdit}>
+                <Save className="w-4 h-4 mr-2" /> Save Changes
+              </Button>
+            </div>
+          </div>
         </Modal>
 
         <Modal isOpen={showCalculatorModal} onClose={() => setShowCalculatorModal(false)} title="Bulk Salary Adjustment">

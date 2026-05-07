@@ -1,3 +1,4 @@
+import { fetchAxios as fetch } from '../lib/axiosConfig';
 export const productService = {
   async getAll() {
     const response = await fetch("/api/products");
@@ -22,6 +23,17 @@ export const productService = {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || "Failed to create product");
+    return data;
+  },
+
+  async createBulk(productsArray) {
+    const response = await fetch("/api/products/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ products: productsArray }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || "Failed to bulk create products");
     return data;
   },
 

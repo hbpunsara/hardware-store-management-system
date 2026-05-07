@@ -1,6 +1,7 @@
 import "dotenv/config";
-import { db } from "./db";
-import { users, products, employees, storeSettings } from "../shared/schema";
+import { eq } from "drizzle-orm";
+import { localDb as db } from "./db";
+import { users, products, employees, storeSettings, notifications, promotions, loyaltyLedger, shifts, customers } from "../shared/schema";
 
 async function seed() {
   const existingUsers = await db.select().from(users);
@@ -52,6 +53,57 @@ async function seed() {
       { key: "store_currency", value: "LKR" },
     ]);
     console.log("Seeded store settings");
+  }
+
+  const existingNotifications = await db.select().from(notifications);
+  if (existingNotifications.length === 0) {
+    await db.insert(notifications).values([
+      { title: "System Update", message: "Hardware Pro version 2.0 deployed successfully.", type: "success" },
+      { title: "Low Stock Alert", message: "Hammer 16oz is running low on stock.", type: "warning" },
+      { title: "New Promotion", message: "Summer Sale promotion is now active.", type: "info" }
+    ]);
+    console.log("Seeded notifications");
+  }
+
+  const existingPromotions = await db.select().from(promotions);
+  if (existingPromotions.length === 0) {
+    await db.insert(promotions).values([
+      { code: "WELCOME10", type: "PERCENTAGE", value: 10, status: "Active" },
+      { code: "BULK50", type: "FLAT", value: 50, minQty: 10, status: "Active" }
+    ]);
+    console.log("Seeded promotions");
+  }
+
+  const existingCustomers = await db.select().from(customers);
+  if (existingCustomers.length === 0) {
+    await db.insert(customers).values([
+      { name: "John Doe", email: "john@example.com", phone: "0771234567", loyaltyPoints: 150, tier: "Retail" },
+      { name: "BuildCo Constructors", email: "procurement@buildco.lk", phone: "0112345678", loyaltyPoints: 500, tier: "Contractor" }
+    ]);
+    console.log("Seeded customers");
+  }
+
+  const existingLoyalty = await db.select().from(loyaltyLedger);
+  if (existingLoyalty.length === 0) {
+    const custs = await db.select().from(customers);
+    if (custs.length > 0) {
+      await db.insert(loyaltyLedger).values([
+        { customerId: custs[0].id, pointsDelta: 100, reason: "Welcome Bonus" },
+        { customerId: custs[0].id, pointsDelta: 50, reason: "Earned from Sale #101" }
+      ]);
+      console.log("Seeded loyalty ledger");
+    }
+  }
+
+  const existingShifts = await db.select().from(shifts);
+  if (existingShifts.length === 0) {
+    const cashiers = await db.select().from(users).where(eq(users.role, "cashier"));
+    if (cashiers.length > 0) {
+      await db.insert(shifts).values([
+        { cashierId: cashiers[0].id, startTime: new Date().toISOString(), startingFloat: 5000, status: "Active" }
+      ]);
+      console.log("Seeded shifts");
+    }
   }
 
   process.exit(0);
