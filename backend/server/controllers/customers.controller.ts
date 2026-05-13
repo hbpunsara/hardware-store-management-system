@@ -98,7 +98,7 @@ export const customersController = {
 
             // Record transaction
             await storage.createTransaction({
-                date: new Date().toISOString(),
+                date: new Date(),
                 description: `Account Payment - ${customer.name}`,
                 category: "Account Payment",
                 type: "Income",
@@ -128,8 +128,8 @@ export const customersController = {
             if (!customer) return res.status(404).json({ message: "Customer not found" });
 
             const [year, month] = monthStr.split('-');
-            const startDate = new Date(parseInt(year), parseInt(month) - 1, 1).toISOString();
-            const endDate = new Date(parseInt(year), parseInt(month), 1).toISOString();
+            const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
+            const endDate = new Date(parseInt(year), parseInt(month), 1);
 
             // Fetch charges (sales on account)
             const accountSales = await db.select().from(sales)

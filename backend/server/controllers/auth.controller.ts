@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import { storage } from "../storage";
 
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_key";
+
 export const authController = {
   login: async (req: Request, res: Response) => {
     const { username, password } = req.body;
@@ -10,22 +14,33 @@ export const authController = {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    const token = jwt.sign(
+      { id: user.id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' } // 7 days session
+    );
+
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
     const { password: _, ...userWithoutPassword } = user;
     res.json(userWithoutPassword);
   },
 
   logout: (_req: Request, res: Response) => {
+    res.clearCookie('auth_token');
     res.json({ message: "Logged out successfully" });
   },
 
   me: async (req: Request, res: Response) => {
-    const { username } = req.query;
-    if (!username || typeof username !== "string") {
-      return res.status(401).json({ message: "Not authenticated" });
-    }
-    const user = await storage.getUserByUsername(username);
+    // With cookie-based auth, req.user is set by the middleware
+    const user = (req as any).user;
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res.status(401).json({ message: "Not authenticated" });
     }
     const { password: _, ...userWithoutPassword } = user;
     res.json(userWithoutPassword);

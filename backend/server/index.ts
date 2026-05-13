@@ -1,16 +1,42 @@
 import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
+import { runSeeds } from "./seed";
 import { registerRoutes } from "./routes";
 import { log } from "./log";
 import { startSyncDaemon } from "./syncManager";
+
+import cookieParser from "cookie-parser";
+import jwt from "jsonwebtoken";
 
 const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
 import path from "path";
 app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
+
+const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_key";
+
+app.use(async (req, res, next) => {
+  const token = req.cookies.auth_token;
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET) as any;
+      const { storage } = require("./storage");
+      const user = await storage.getUser(decoded.id);
+      if (user) {
+        // Option to verify global_token_version could be done here,
+        // but for MVP auth we'll just check if user exists.
+        (req as any).user = user;
+      }
+    } catch (e) {
+      console.error("Auth middleware error (invalid token):", (e as Error).message);
+    }
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -40,7 +66,21 @@ app.use((req, res, next) => {
   next();
 });
 
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+
 (async () => {
+  // Ensure DB is initialized and migrated
+  console.log("Running migrations...");
+  try {
+    const { db } = await import("./db");
+    await migrate(db, { migrationsFolder: "./migrations-pg" });
+    console.log("Migrations completed.");
+  } catch (err) {
+    console.error("Migration failed:", err);
+  }
+
+  await runSeeds().catch(err => console.error("Auto-seeding failed:", err));
+
   const server = await registerRoutes(app);
 
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

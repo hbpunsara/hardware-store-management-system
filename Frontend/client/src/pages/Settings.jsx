@@ -352,6 +352,17 @@ export const Settings = () => {
     }
   };
 
+  const handleForceLogout = async () => {
+    try {
+      toast.info("Revoking all active sessions...");
+      await userService.forceLogoutAll();
+      localStorage.removeItem("hardware_pos_user");
+      window.location.href = "/login";
+    } catch (err) {
+      toast.error(err.message || "Failed to force logout all users");
+    }
+  };
+
 
   const renderStoreProfile = () => (
     <div className="space-y-6">
@@ -681,10 +692,14 @@ export const Settings = () => {
 
     const handleSyncNow = async () => {
       try {
+        setSyncStatus(prev => ({ ...prev, loading: true }));
+        toast.info("Syncing data to cloud...");
+        await systemService.syncNow();
         await fetchSyncStatus();
-        toast.success("Sync status refreshed!");
-      } catch {
-        toast.error("Failed to reach server.");
+        toast.success("Sync completed successfully!");
+      } catch (err) {
+        toast.error(err.message || "Failed to reach server or perform sync.");
+        setSyncStatus(prev => ({ ...prev, loading: false }));
       }
     };
 
@@ -822,6 +837,13 @@ export const Settings = () => {
               <option>Strong</option>
               <option>Very Strong</option>
             </select>
+          </div>
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-[#E60012]/20">
+            <div>
+              <p className="font-bold text-[#E60012]">Danger Zone</p>
+              <p className="text-sm text-gray-500">Revoke access for all currently logged in users</p>
+            </div>
+            <Button variant="secondary" className="border-[#E60012] text-[#E60012] hover:bg-[#E60012] hover:text-white" onClick={handleForceLogout}>Force Logout All Users</Button>
           </div>
         </div>
       </div>

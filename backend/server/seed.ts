@@ -1,9 +1,10 @@
 import "dotenv/config";
 import { eq } from "drizzle-orm";
-import { localDb as db } from "./db";
+import { db } from "./db";
 import { users, products, employees, storeSettings, notifications, promotions, loyaltyLedger, shifts, customers } from "../shared/schema";
 
-async function seed() {
+export async function runSeeds() {
+  console.log("Checking if seeding is needed...");
   const existingUsers = await db.select().from(users);
   if (existingUsers.length === 0) {
     await db.insert(users).values([
@@ -12,8 +13,6 @@ async function seed() {
       { username: "inventory", password: "inv123", name: "Robert Fernando", role: "inventory_manager" },
     ]);
     console.log("Seeded users: admin, cashier");
-  } else {
-    console.log("Users already exist, skipping");
   }
 
   const existingProducts = await db.select().from(products);
@@ -28,16 +27,14 @@ async function seed() {
       { sku: "KNIFE-U", name: "Utility Knife", category: "Tools", price: 5.75, stock: 25, supplier: "ForgeCo" },
     ]);
     console.log("Seeded 7 products");
-  } else {
-    console.log("Products already exist, skipping");
   }
 
   const existingEmployees = await db.select().from(employees);
   if (existingEmployees.length === 0) {
     await db.insert(employees).values([
-      { name: "John Perera", role: "Cashier", department: "Sales", status: "Absent", avatar: "JP" },
-      { name: "Mary Silva", role: "Cashier", department: "Sales", status: "Absent", avatar: "MS" },
-      { name: "Robert Fernando", role: "Stock Manager", department: "Inventory", status: "Absent", avatar: "RF" },
+      { name: "John Perera", role: "Cashier", department: "Sales", status: "Absent", avatar: "JP", basicSalary: 45000, nic: "199012345678", bankName: "BOC", accountNumber: "123456789" },
+      { name: "Mary Silva", role: "Cashier", department: "Sales", status: "Absent", avatar: "MS", basicSalary: 42000, nic: "199298765432", bankName: "Sampath", accountNumber: "987654321" },
+      { name: "Robert Fernando", role: "Stock Manager", department: "Inventory", status: "Absent", avatar: "RF", basicSalary: 55000, nic: "198555554444", bankName: "HNB", accountNumber: "456123789" },
     ]);
     console.log("Seeded employees");
   }
@@ -55,14 +52,11 @@ async function seed() {
     console.log("Seeded store settings");
   }
 
+  // Notifications - skipped to prevent hardcoded alerts
   const existingNotifications = await db.select().from(notifications);
   if (existingNotifications.length === 0) {
-    await db.insert(notifications).values([
-      { title: "System Update", message: "Hardware Pro version 2.0 deployed successfully.", type: "success" },
-      { title: "Low Stock Alert", message: "Hammer 16oz is running low on stock.", type: "warning" },
-      { title: "New Promotion", message: "Summer Sale promotion is now active.", type: "info" }
-    ]);
-    console.log("Seeded notifications");
+    // No default notifications
+    console.log("Skipping notification seeding");
   }
 
   const existingPromotions = await db.select().from(promotions);
@@ -105,11 +99,15 @@ async function seed() {
       console.log("Seeded shifts");
     }
   }
-
-  process.exit(0);
 }
 
-seed().catch((err) => {
-  console.error("Seed failed:", err);
-  process.exit(1);
-});
+// Keep the CLI execution support
+if (process.argv[1] && process.argv[1].endsWith('seed.js')) {
+  runSeeds().then(() => {
+    console.log("Seed finished");
+    process.exit(0);
+  }).catch(err => {
+    console.error("Seed failed", err);
+    process.exit(1);
+  });
+}

@@ -66,17 +66,16 @@ export const salesController = {
       let storeAccountAmount = 0;
       let paymentMethodString = paymentMethod ?? "Cash";
 
-      // If paymentMethod is an array of split tenders
+      // Sum up any portion paid via Store Account or Trade
       if (Array.isArray(paymentMethod)) {
         paymentMethodString = JSON.stringify(paymentMethod);
 
-        // Sum up any portion paid via Store Account
         for (const tender of paymentMethod) {
-          if (tender.method === "Store Account" || tender.type === "Store Account") {
+          if (["Store Account", "Store Credit", "Trade", "Trader"].includes(tender.method) || ["Store Account", "Trade", "Trader"].includes(tender.type)) {
             storeAccountAmount += Number(tender.amount) || 0;
           }
         }
-      } else if (paymentMethod === "Store Account") {
+      } else if (["Store Account", "Trade", "Trader"].includes(paymentMethod)) {
         storeAccountAmount = Number(total ?? 0);
       }
 
@@ -92,12 +91,15 @@ export const salesController = {
         customerId: customerId ?? null,
       };
 
-      const normalizedItems = items.map((item: any) => ({
-        productId: item.productId ?? null,
-        productName: String(item.productName),
-        quantity: Number(item.quantity) || 1,
-        price: Number(item.price ?? 0),
-      }));
+      const normalizedItems = items.map((item: any) => {
+        const pId = parseInt(item.productId);
+        return {
+          productId: isNaN(pId) ? null : pId,
+          productName: String(item.productName),
+          quantity: Number(item.quantity) || 1,
+          price: Number(item.price ?? 0),
+        };
+      });
 
       const sale = await storage.createSale(saleData, normalizedItems);
 
@@ -278,13 +280,13 @@ export const salesController = {
           html
         });
 
-        const updated = await storage.updateSaleEmailedAt(sale.id, new Date().toISOString());
+        const updated = await storage.updateSaleEmailedAt(sale.id, new Date());
         res.json({ message: "Invoice sent successfully", sale: updated });
       } catch (err) {
         console.error("SMTP Mail error:", err);
         // Fallback for non-configured environment: pretend successful but log warning
         console.warn("Emails not configured properly. Generating fake success for simulation purposes.");
-        const updated = await storage.updateSaleEmailedAt(sale.id, new Date().toISOString());
+        const updated = await storage.updateSaleEmailedAt(sale.id, new Date());
         res.json({ message: "Invoice logged as sent (SMTP simulation)", sale: updated });
       }
 

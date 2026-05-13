@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import { storage } from "../storage";
 
-function toTransactionRow(row: { id: number; date: string; description: string; category: string; type: string; amount: number | string; method: string; customerId: number | null }) {
+function toTransactionRow(row: { id: number; date: Date; description: string; category: string; type: string; amount: number | string; method: string; customerId: number | null }) {
   return {
     id: row.id,
-    date: row.date,
+    date: row.date.toISOString(),
     description: row.description,
     category: row.category,
     type: row.type,
@@ -26,7 +26,7 @@ export const transactionsController = {
       return res.status(400).json({ message: "Missing required fields: date, description, category, type, amount, method" });
     }
     const row = await storage.createTransaction({
-      date: String(date),
+      date: new Date(String(date)),
       description: String(description),
       category: String(category),
       type: String(type),

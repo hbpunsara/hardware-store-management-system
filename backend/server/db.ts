@@ -1,32 +1,27 @@
-import Database from "better-sqlite3";
-import { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
-
 import pg from "pg";
-import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "../shared/schema";
 
-// 1. Local Database (SQLite)
-const sqlite = new Database("hardware_store_local.db");
-export const localDb = drizzleSqlite(sqlite, { schema });
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is not set. Please provide a Postgres connection string.");
+}
 
-// 2. Remote Database (Postgres) - Optional init depending on connectivity
-let remoteDbInstance: ReturnType<typeof drizzlePg> | null = null;
+console.log("Initializing DB pool with URL:", process.env.DATABASE_URL?.split('@')[1] || "NOT SET");
+const sslConfig = process.env.DATABASE_URL?.includes('localhost') || 
+                  process.env.DATABASE_URL?.includes('127.0.0.1') || 
+                  process.env.DATABASE_URL?.includes('db') ||
+                  process.env.DATABASE_URL?.includes('postgres')
+    ? false 
+    : { rejectUnauthorized: false };
+console.log("SSL Config:", JSON.stringify(sslConfig));
 
-export const getRemoteDb = () => {
-  if (remoteDbInstance) return remoteDbInstance;
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: sslConfig
+});
 
-  if (process.env.DATABASE_URL) {
-    const pool = new pg.Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }
-    });
-    remoteDbInstance = drizzlePg(pool, { schema });
-    return remoteDbInstance;
-  }
-  return null;
-};
+export const db = drizzle(pool, { schema });
 
-// Backwards compatibility for existing controllers trying to just use `db`
-// In a fully offline-first app, all reads/writes should go to `localDb`
-// NOTE: Since we are running in a Docker container connected to Postgres, we should use the remote DB if configured.
-export const db = process.env.DATABASE_URL ? getRemoteDb()! : localDb;
+// Helper to check connectivity (used by system controller)
+export const getRemoteDb = () => db;
+

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { storage } from "../storage";
 
-function toEmployeeRow(row: { id: number; name: string; role: string; department: string; status?: string | null; checkIn?: string | null; checkOut?: string | null; hours?: string | null; avatar?: string | null }) {
+function toEmployeeRow(row: any) {
   return {
     id: row.id,
     name: row.name,
@@ -11,7 +11,11 @@ function toEmployeeRow(row: { id: number; name: string; role: string; department
     checkIn: row.checkIn ?? "-",
     checkOut: row.checkOut ?? "-",
     hours: row.hours ?? "-",
-    avatar: row.avatar ?? (row.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)),
+    avatar: row.avatar ?? (row.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)),
+    basicSalary: row.basicSalary ?? 0,
+    bankName: row.bankName ?? "",
+    accountNumber: row.accountNumber ?? "",
+    nic: row.nic ?? "",
   };
 }
 
@@ -22,7 +26,7 @@ export const employeesController = {
   },
 
   create: async (req: Request, res: Response) => {
-    const { name, role, department } = req.body;
+    const { name, role, department, basicSalary, bankName, accountNumber, nic } = req.body;
     if (!name || !role || !department) {
       return res.status(400).json({ message: "Missing required fields: name, role, department" });
     }
@@ -36,6 +40,10 @@ export const employeesController = {
       checkOut: "-",
       hours: "-",
       avatar: initials,
+      basicSalary: basicSalary ? Number(basicSalary) : 0,
+      bankName: bankName ? String(bankName) : "",
+      accountNumber: accountNumber ? String(accountNumber) : "",
+      nic: nic ? String(nic) : "",
     });
     res.status(201).json(toEmployeeRow(row));
   },
@@ -45,12 +53,20 @@ export const employeesController = {
     if (Number.isNaN(id)) {
       return res.status(400).json({ message: "Invalid employee id" });
     }
-    const { status, checkIn, checkOut, hours } = req.body;
+    const { status, checkIn, checkOut, hours, name, role, department, basicSalary, bankName, accountNumber, nic } = req.body;
     const updateData: Record<string, unknown> = {};
     if (status != null) updateData.status = String(status);
     if (checkIn != null) updateData.checkIn = String(checkIn);
     if (checkOut != null) updateData.checkOut = String(checkOut);
     if (hours != null) updateData.hours = String(hours);
+    if (name != null) updateData.name = String(name);
+    if (role != null) updateData.role = String(role);
+    if (department != null) updateData.department = String(department);
+    if (basicSalary != null) updateData.basicSalary = Number(basicSalary);
+    if (bankName != null) updateData.bankName = String(bankName);
+    if (accountNumber != null) updateData.accountNumber = String(accountNumber);
+    if (nic != null) updateData.nic = String(nic);
+
     const row = await storage.updateEmployee(id, updateData);
     if (!row) {
       return res.status(404).json({ message: "Employee not found" });

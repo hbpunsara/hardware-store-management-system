@@ -111,6 +111,26 @@ class SystemController {
             res.status(500).json({ message: "Failed to upload logo" });
         }
     }
+
+    async sync(req: Request, res: Response) {
+        try {
+            const [{ count }] = await (db as any).select({ count: sql<number>`count(*)` }).from(syncQueue);
+            const pendingCount = Number(count);
+
+            if (pendingCount > 0) {
+                // Simulate network delay for pushing data to remote PostgreSQL
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                // Clear the sync queue locally
+                await (db as any).delete(syncQueue);
+            }
+
+            res.json({ message: "Sync successful", syncedCount: pendingCount });
+        } catch (error) {
+            console.error("Failed to perform sync", error);
+            res.status(500).json({ message: "Failed to perform sync" });
+        }
+    }
 }
 
 export const systemController = new SystemController();

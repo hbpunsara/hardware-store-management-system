@@ -91,7 +91,7 @@ export const usersController = {
         userStatusOverrides[id] = status;
       }
       
-      const user = userRow ? toUserRow(userRow) : { id, message: "Updated" };
+      const user: any = userRow ? toUserRow(userRow) : { id, message: "Updated", status: userStatusOverrides[id] ?? "Active" };
       if (status) user.status = status;
 
       res.json(user);

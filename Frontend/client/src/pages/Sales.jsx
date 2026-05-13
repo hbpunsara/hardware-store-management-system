@@ -193,7 +193,17 @@ export const Sales = () => {
                       <td className="font-bold text-gray-900">LKR {formatCurrency(sale.total)}</td>
                       <td>
                         <span className="nintendo-badge nintendo-badge-info">
-                          {sale.paymentMethod || "cash"}
+                          {(() => {
+                            try {
+                              const methods = typeof sale.paymentMethod === 'string' ? JSON.parse(sale.paymentMethod) : sale.paymentMethod;
+                              if (Array.isArray(methods)) {
+                                return methods.map(m => m.method).join(", ");
+                              }
+                              return sale.paymentMethod || "Cash";
+                            } catch (e) {
+                              return sale.paymentMethod || "Cash";
+                            }
+                          })()}
                         </span>
                       </td>
                       <td>
@@ -226,10 +236,24 @@ export const Sales = () => {
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-500">Payment Method</p>
-                <span className="nintendo-badge nintendo-badge-info capitalize">
-                  {selectedSale.paymentMethod || "cash"}
-                </span>
+                <p className="text-sm text-gray-500">Payment Details</p>
+                <div className="flex flex-col gap-1 items-end">
+                  {(() => {
+                    try {
+                      const methods = typeof selectedSale.paymentMethod === 'string' ? JSON.parse(selectedSale.paymentMethod) : selectedSale.paymentMethod;
+                      if (Array.isArray(methods)) {
+                        return methods.map((m, i) => (
+                          <span key={i} className="nintendo-badge nintendo-badge-info whitespace-nowrap">
+                            {m.method}: LKR {formatCurrency(m.amount)}
+                          </span>
+                        ));
+                      }
+                      return <span className="nintendo-badge nintendo-badge-info">{selectedSale.paymentMethod || "Cash"}</span>;
+                    } catch (e) {
+                      return <span className="nintendo-badge nintendo-badge-info">{selectedSale.paymentMethod || "Cash"}</span>;
+                    }
+                  })()}
+                </div>
               </div>
             </div>
 

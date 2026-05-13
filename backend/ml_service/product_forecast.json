@@ -1,0 +1,58 @@
+{
+  "products": [
+    {
+      "name": "Hammer 16oz",
+      "history": [
+        {
+          "month": "Mar 2026",
+          "qty": 12
+        }
+      ],
+      "forecast": [
+        {
+          "month": "Jun 2026",
+          "qty": 12
+        },
+        {
+          "month": "Jul 2026",
+          "qty": 12
+        },
+        {
+          "month": "Aug 2026",
+          "qty": 12
+        }
+      ],
+      "totalSold": 12,
+      "avgMonthly": 12.0,
+      "trend": "stable",
+      "growthPct": 0.0
+    },
+    {
+      "name": "Test Item",
+      "history": [
+        {
+          "month": "Mar 2026",
+          "qty": 7
+        }
+      ],
+      "forecast": [
+        {
+          "month": "Jun 2026",
+          "qty": 7
+        },
+        {
+          "month": "Jul 2026",
+          "qty": 7
+        },
+        {
+          "month": "Aug 2026",
+          "qty": 7
+        }
+      ],
+      "totalSold": 7,
+      "avgMonthly": 7.0,
+      "trend": "stable",
+      "growthPct": 0.0
+    }
+  ]
+}

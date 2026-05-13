@@ -1,18 +1,31 @@
 import sqlite3
+import psycopg2
 import pandas as pd
 import json
 import os
 import sys
 
-def generate_forecast():
+def get_connection():
+    db_url = os.environ.get('DATABASE_URL')
+    if db_url and db_url.startswith('postgresql://'):
+        # Convert postgresql:// to compatible format for psycopg2 if needed, 
+        # but usually it works directly or with small tweaks.
+        return psycopg2.connect(db_url)
+    
     script_dir = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(script_dir, '..', 'hardware_store_local.db')
+    return sqlite3.connect(db_path)
+
+def generate_forecast():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
     json_path = os.path.join(script_dir, 'forecast.json')
     
     try:
-        conn = sqlite3.connect(db_path)
-        df = pd.read_sql_query("SELECT created_at, total FROM sales WHERE status != 'Voided'", conn)
+        conn = get_connection()
+        query = "SELECT created_at, total FROM sales WHERE status != 'Voided'"
+        df = pd.read_sql_query(query, conn)
         conn.close()
+
         
         if df.empty:
             forecast = [0, 0, 0]

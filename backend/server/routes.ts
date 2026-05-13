@@ -43,6 +43,13 @@ import { loyaltyController } from "./controllers/loyalty.controller";
 import { shiftsController } from "./controllers/shifts.controller";
 import { printerController } from "./controllers/printer.controller";
 import { notificationsController } from "./controllers/notifications.controller";
+import { validateSchema } from "./middleware/validate";
+import { 
+  insertProductSchema, 
+  insertSaleSchema, 
+  createSaleRequestSchema,
+  insertEmployeeSchema 
+} from "../shared/schema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
@@ -56,8 +63,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products/search", productController.search);
   app.get("/api/products/:id", productController.getById);
   app.post("/api/products/bulk", productController.createBulk);
-  app.post("/api/products", productController.create);
-  app.put("/api/products/:id", productController.update);
+  app.post("/api/products", validateSchema(insertProductSchema), productController.create);
+  app.put("/api/products/:id", validateSchema(insertProductSchema.partial()), productController.update);
   app.delete("/api/products/:id", productController.delete);
 
   // Parked Sales
@@ -70,7 +77,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/sales", salesController.getAll);
   app.get("/api/sales/today-summary", salesController.getTodaySummary);
   app.get("/api/sales/:id", salesController.getById);
-  app.post("/api/sales", salesController.create);
+  app.post("/api/sales", validateSchema(createSaleRequestSchema), salesController.create);
   app.post("/api/sales/:id/void", salesController.voidSale);
   app.post("/api/sales/:id/email", salesController.emailInvoice);
 
@@ -79,8 +86,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Employees routes
   app.get("/api/employees", employeesController.getAll);
-  app.post("/api/employees", employeesController.create);
-  app.put("/api/employees/:id", employeesController.update);
+  app.post("/api/employees", validateSchema(insertEmployeeSchema), employeesController.create);
+  app.put("/api/employees/:id", validateSchema(insertEmployeeSchema.partial()), employeesController.update);
   app.delete("/api/employees/:id", employeesController.delete);
 
   // Transactions (Finance) routes
@@ -108,9 +115,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Payroll routes
   app.get("/api/payroll", payrollController.getAll);
+  app.get("/api/payroll/all", payrollController.getAll);
   app.post("/api/payroll/calculate", payrollController.calculateAll);
   app.post("/api/payroll/process", payrollController.processAll);
+  app.post("/api/payroll/delete-month", payrollController.deleteMonth);
   app.put("/api/payroll/:id", payrollController.update);
+  app.get("/api/payroll/:id/payslip-pdf", payrollController.getPayslip);
+
+  // Employee Salary Config routes
+  app.get("/api/employees/:employeeId/salary-config", payrollController.getSalaryConfig);
+  app.put("/api/employees/:employeeId/salary-info", payrollController.updateBasicSalary);
+  app.post("/api/employees/:employeeId/salary-components", payrollController.addSalaryComponent);
+  app.put("/api/salary-components/:compId", payrollController.updateSalaryComponent);
+  app.delete("/api/salary-components/:compId", payrollController.deleteSalaryComponent);
 
   // Customers routes
   app.get("/api/customers", customersController.getAll);
@@ -154,6 +171,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/returns/:id", returnsController.getById);
   app.post("/api/returns", returnsController.createReturn);
 
+  // Printer routes
+  app.post("/api/printer/receipt", printerController.printReceipt);
+
   // Promotions
   app.get("/api/promotions", promotionsController.getAll);
   app.get("/api/promotions/active", promotionsController.getActive);
@@ -166,12 +186,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/reports/overview", reportsController.getOverview);
   app.get("/api/reports/weekly-trend", reportsController.getWeeklyTrend);
   app.get("/api/reports/forecasting", reportsController.getForecasting);
+  app.get("/api/reports/product-forecasting", reportsController.getProductForecasting);
   app.get("/api/reports/basket-analysis", reportsController.getBasketAnalysis);
   app.get("/api/reports/insights", reportsController.getInsights);
 
 
   // System routes
   app.get("/api/system/status", systemController.getStatus);
+  app.post("/api/system/sync", systemController.sync);
   app.get("/api/system/backups", systemController.getBackups);
   app.post("/api/system/backup", systemController.createBackup);
   app.post("/api/system/upload-logo", upload.single("logo"), systemController.uploadLogo);
@@ -187,7 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const marketBasketPath = path.join(process.cwd(), "ml_service", "market_basket.py");
       const seasonalAnalysisPath = path.join(process.cwd(), "ml_service", "seasonal_analysis.py");
       
-      // Use python or python3 based on environment, usually 'python' on windows but python3 is in the original code
+      // Use python or python3 based on environment
       await execAsync(`python "${marketBasketPath}" train`).catch(() => execAsync(`python3 "${marketBasketPath}" train`));
       await execAsync(`python "${seasonalAnalysisPath}" train`).catch(() => execAsync(`python3 "${seasonalAnalysisPath}" train`));
       

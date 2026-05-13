@@ -12,6 +12,12 @@ export const reportsService = {
     return response.json();
   },
 
+  async getProductForecasting() {
+    const response = await fetch("/api/reports/product-forecasting");
+    if (!response.ok) throw new Error("Failed to fetch product forecasting");
+    return response.json();
+  },
+
   async getBasketAnalysis() {
     const response = await fetch("/api/reports/basket-analysis");
     if (!response.ok) throw new Error("Failed to fetch basket analysis");

@@ -12,9 +12,20 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const userJson = localStorage.getItem('hardware_pos_user');
+  let userId = '';
+  if (userJson) {
+    try {
+      userId = JSON.parse(userJson).id;
+    } catch (e) {}
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...(data ? { "Content-Type": "application/json" } : {}),
+      ...(userId ? { "X-User-ID": userId } : {})
+    },
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,8 +40,19 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const userJson = localStorage.getItem('hardware_pos_user');
+    let userId = '';
+    if (userJson) {
+      try {
+        userId = JSON.parse(userJson).id;
+      } catch (e) {}
+    }
+
     const res = await fetch(queryKey.join("/") as string, {
       credentials: "include",
+      headers: {
+        ...(userId ? { "X-User-ID": userId } : {})
+      }
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

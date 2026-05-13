@@ -173,12 +173,12 @@ export const Finance = () => {
   ];
 
   return (
-    <div className="flex min-h-screen bg-[#F5F5F5]">
+    <div className="flex h-screen overflow-hidden bg-[#F5F5F5]">
       <Sidebar />
-      <main className="flex-1">
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <Navbar title="Finance Management" />
 
-        <div className="p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex gap-3">
               <Button variant={dateRange === "today" ? "primary" : "secondary"} onClick={() => setDateRange("today")}>

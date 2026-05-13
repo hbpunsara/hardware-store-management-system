@@ -19,12 +19,18 @@ import {
   Clock,
   Play,
   Square,
-  X
+  X,
+  Settings as SettingsIcon,
 } from "lucide-react";
+
+
+
 import { useAuth } from "../context/AuthContext";
 import { Modal } from "./Modal";
 import { useToast } from "./Toast";
+import { motion, AnimatePresence } from "framer-motion";
 import { shiftService } from "../services/shiftService";
+
 
 const mainNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/", roles: ["admin", "inventory_manager"] },
@@ -44,13 +50,33 @@ const managementNavItems = [
   { icon: BarChart3, label: "Analytics", path: "/reports", roles: ["admin"] },
 ];
 
+const NavItem = ({ item, location }) => {
+  const isActive = location === item.path || (item.path !== '/' && location.startsWith(item.path));
+  const Icon = item.icon;
+
+  return (
+    <Link href={item.path}>
+      <button
+        className={`group relative flex items-center h-12 rounded-xl transition-all duration-300 gap-4 px-4 w-full ${isActive ? 'bg-[#E60012] text-white shadow-[0_0_20px_rgba(230,0,18,0.3)]' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+      >
+        <Icon className={`shrink-0 transition-all duration-300 w-5 h-5 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+        <span className="font-bold text-sm truncate">
+          {item.label}
+        </span>
+      </button>
+    </Link>
+  );
+};
+
 export const Sidebar = () => {
+
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   const [activeShift, setActiveShift] = useState(null);
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [shiftAmount, setShiftAmount] = useState("");
   const toast = useToast();
+
 
   const [isOpen, setIsOpen] = useState(false);
 
@@ -67,9 +93,18 @@ export const Sidebar = () => {
 
   useEffect(() => {
     if (user && ["admin", "cashier"].includes(user.role)) {
-      shiftService.getActiveShift().then(setActiveShift).catch(() => { });
+      shiftService.getActiveShift()
+        .then(shift => {
+          setActiveShift(shift);
+          // Auto-prompt cashier to start shift if none active
+          if (!shift && user.role === 'cashier') {
+            setShowShiftModal(true);
+          }
+        })
+        .catch(() => { });
     }
   }, [user]);
+
 
   const handleLogout = () => {
     logout();
@@ -96,109 +131,134 @@ export const Sidebar = () => {
     }
   };
 
-  const NavItem = ({ item }) => {
-    const isActive = location === item.path || (item.path !== '/' && location.startsWith(item.path));
-    const Icon = item.icon;
 
-    return (
-      <Link href={item.path}>
-        <button
-          className={`nintendo-nav-item w-full ${isActive ? 'active' : ''}`}
-        >
-          <Icon className="w-5 h-5" />
-          <span>{item.label}</span>
-        </button>
-      </Link>
-    );
-  };
+
 
   return (
     <>
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-      <aside className={`nintendo-sidebar flex flex-col w-[280px] min-h-screen fixed md:relative z-50 transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-[#E60012] rounded-xl flex items-center justify-center shadow-lg">
-              <Wrench className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-extrabold text-white">Hardware POS</h1>
-              <p className="text-xs text-gray-400 font-medium">Hybrid Management</p>
-            </div>
-          </div>
-          <button 
-            className="md:hidden text-gray-400 hover:text-white"
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
             onClick={() => setIsOpen(false)}
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
+          />
+        )}
+      </AnimatePresence>
 
-      <nav className="flex-1 p-4 overflow-y-auto">
-        <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3 px-4">Main Menu</p>
-        <div className="flex flex-col gap-1 mb-6">
-          {mainNavItems.filter(i => i.roles.includes(user?.role)).map((item) => (
-            <NavItem key={item.path} item={item} />
-          ))}
-        </div>
-
-        {managementNavItems.filter(i => i.roles.includes(user?.role)).length > 0 && (
-          <>
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3 px-4">Management</p>
-            <div className="flex flex-col gap-1 mb-6">
-              {managementNavItems.filter(i => i.roles.includes(user?.role)).map((item) => (
-                <NavItem key={item.path} item={item} />
-              ))}
+      <motion.aside 
+        initial={false}
+        className={`nintendo-sidebar flex flex-col h-screen fixed md:relative z-50 border-r border-white/5 bg-[#121212] w-[240px] ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}
+      >
+        <div className="flex items-center h-20 px-4 justify-between">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="w-9 h-9 bg-[#E60012] rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(230,0,18,0.4)] shrink-0">
+              <Wrench className="w-5 h-5 text-white" />
             </div>
-          </>
-        )}
-
-        {user?.role === "admin" && (
-          <>
-            <p className="text-xs text-gray-500 font-bold uppercase tracking-wider mb-3 px-4">System</p>
-            <Link href="/settings">
-              <button className={`nintendo-nav-item w-full ${location === '/settings' ? 'active' : ''}`}>
-                <Settings className="w-5 h-5" />
-                <span>Settings</span>
-              </button>
-            </Link>
-          </>
-        )}
-      </nav>
-
-      <div className="p-4 border-t border-white/10">
-        <div className="flex items-center gap-3 px-4 py-3 mb-3 bg-white/5 rounded-xl">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#E60012] to-[#FF6B6B] rounded-full flex items-center justify-center">
-            <span className="text-white font-bold text-sm">
-              {user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?'}
-            </span>
-          </div>
-          <div>
-            <p className="text-white font-semibold text-sm">{user?.name || 'Guest'}</p>
-            <p className="text-gray-400 text-xs">{user?.role || '—'}</p>
+            <motion.div 
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="flex flex-col justify-center"
+            >
+              <h1 className="text-lg font-black text-white tracking-tight leading-none uppercase">PRO<span className="text-[#E60012]">HARDWARE</span></h1>
+              <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.1em] mt-0.5">System v2.0</p>
+            </motion.div>
           </div>
         </div>
 
-        {user && ["admin", "cashier"].includes(user.role) && (
-          <button
-            onClick={() => setShowShiftModal(true)}
-            className={`nintendo-nav-item w-full mb-2 ${activeShift ? 'text-[#7AC143] hover:bg-white/10' : 'text-[#F5A623] hover:bg-white/10'}`}
-          >
-            <Clock className="w-5 h-5" />
-            <span>{activeShift ? "End Shift" : "Start Shift"}</span>
-          </button>
-        )}
 
-        <button onClick={handleLogout} className="nintendo-nav-item w-full text-gray-400 hover:text-white">
-          <LogOut className="w-5 h-5" />
-          <span>Logout</span>
-        </button>
-      </div>
+        <nav className="flex-1 py-4 overflow-y-auto no-scrollbar scroll-smooth px-4">
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.4 }}
+            className="text-[10px] text-white font-black uppercase tracking-[0.2em] mb-4 px-4"
+          >
+            Navigation
+          </motion.p>
+          <div className="space-y-1 mb-8">
+            {mainNavItems.filter(i => user?.role && i.roles.includes(user.role)).map((item) => (
+              <NavItem key={item.path} item={item} location={location} />
+            ))}
+          </div>
+
+
+          <motion.p 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.4 }}
+            className="text-[10px] text-white font-black uppercase tracking-[0.2em] mb-4 px-4"
+          >
+            Management
+          </motion.p>
+          <div className="space-y-1 mb-8">
+            {managementNavItems.filter(i => user?.role && i.roles.includes(user.role)).map((item) => (
+              <NavItem key={item.path} item={item} location={location} />
+            ))}
+            
+            {user?.role === "admin" && (
+              <Link href="/settings">
+                <button 
+                  className={`group relative flex items-center h-12 rounded-xl transition-all duration-300 gap-4 px-4 w-full ${location === '/settings' ? 'bg-[#E60012] text-white shadow-[0_0_20px_rgba(230,0,18,0.3)]' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                >
+                  <SettingsIcon className={`shrink-0 transition-all duration-300 w-5 h-5 ${location === '/settings' ? 'scale-110' : 'group-hover:scale-110'}`} />
+                  <span className="font-bold text-sm truncate">Settings</span>
+                </button>
+              </Link>
+            )}
+
+          </div>
+        </nav>
+
+        <div className="p-4 mt-auto border-t border-white/5 bg-white/5 backdrop-blur-md">
+          <div className="flex items-center gap-3 mb-4 rounded-2xl transition-all p-2">
+            <div className="w-10 h-10 bg-gradient-to-br from-gray-700 to-gray-800 border border-white/10 rounded-xl flex items-center justify-center shrink-0 shadow-xl overflow-hidden relative group">
+              <span className="text-white font-black text-xs relative z-10">
+                {user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || '?'}
+              </span>
+              <div className="absolute inset-0 bg-[#E60012] opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+            <div className="min-w-0">
+              {user ? (
+                <>
+                  <p className="text-white font-bold text-sm truncate leading-tight">{user.name || 'Guest'}</p>
+                  <p className="text-gray-500 text-[10px] font-black uppercase tracking-wider">{user.role || '—'}</p>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <div className="w-20 h-3 bg-white/10 rounded animate-pulse" />
+                  <div className="w-12 h-2 bg-white/5 rounded animate-pulse" />
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          <div className="space-y-1">
+            {user && ["admin", "cashier"].includes(user.role) && (
+              <button
+                onClick={() => setShowShiftModal(true)}
+                className={`group flex items-center h-11 rounded-xl transition-all w-full gap-4 px-4 ${activeShift ? 'text-[#7AC143] bg-[#7AC143]/5' : 'text-[#F5A623] bg-[#F5A623]/5'} hover:scale-[1.02] active:scale-95`}
+              >
+                <Clock className="shrink-0 w-5 h-5" />
+                <span className="font-bold text-xs truncate">{activeShift ? "End Shift" : "Start Shift"}</span>
+              </button>
+            )}
+
+            <button 
+              onClick={handleLogout} 
+              className="group flex items-center h-11 rounded-xl transition-all w-full text-gray-500 hover:text-white hover:bg-white/5 gap-4 px-4 active:scale-95"
+            >
+              <LogOut className="shrink-0 w-5 h-5" />
+              <span className="font-bold text-xs truncate">Logout</span>
+            </button>
+          </div>
+        </div>
+
+      </motion.aside>
+
+
+
       <Modal
         isOpen={showShiftModal}
         onClose={() => setShowShiftModal(false)}
@@ -208,8 +268,9 @@ export const Sidebar = () => {
           <p className="text-sm text-gray-600">
             {activeShift
               ? "Please count the cash drawer and enter the actual total amount."
-              : "Enter the starting cash float for this register."}
+              : "Welcome! To start your work day, please enter the starting cash float for this register."}
           </p>
+
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-2">Amount (LKR)</label>
             <input
@@ -233,7 +294,6 @@ export const Sidebar = () => {
           </div>
         </div>
       </Modal>
-    </aside>
     </>
   );
 };

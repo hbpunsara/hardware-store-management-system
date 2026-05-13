@@ -71,7 +71,7 @@ export interface IStorage {
   getSale(id: number): Promise<(Sale & { items: SaleItem[] }) | undefined>;
   createSale(sale: InsertSale, items: Omit<InsertSaleItem, "saleId">[]): Promise<Sale>;
   updateSaleStatus(id: number, status: string): Promise<Sale | undefined>;
-  updateSaleEmailedAt(id: number, emailedAt: string): Promise<Sale | undefined>;
+  updateSaleEmailedAt(id: number, emailedAt: Date): Promise<Sale | undefined>;
   getSalesStats(start: Date, end: Date): Promise<{ totalAmount: number; count: number }>;
 
   getAllEmployees(): Promise<Employee[]>;
@@ -166,7 +166,7 @@ export class DatabaseStorage implements IStorage {
   async updateUser(id: string, updateData: Partial<InsertUser>): Promise<User | undefined> {
     const [user] = await db
       .update(users)
-      .set({ ...updateData, isSynced: false, updatedAt: new Date().toISOString() })
+      .set({ ...updateData, isSynced: false, updatedAt: new Date() })
       .where(eq(users.id, id))
       .returning();
     if (user) await this.pushToSyncQueue('users', 'UPDATE', user.id, user);
@@ -195,7 +195,7 @@ export class DatabaseStorage implements IStorage {
   async updateProduct(id: number, updateData: Partial<InsertProduct>): Promise<Product | undefined> {
     const [product] = await db
       .update(products)
-      .set({ ...updateData, isSynced: false, updatedAt: new Date().toISOString() })
+      .set({ ...updateData, isSynced: false, updatedAt: new Date() })
       .where(eq(products.id, id))
       .returning();
     if (product) await this.pushToSyncQueue('products', 'UPDATE', product.id, product);
@@ -254,7 +254,7 @@ export class DatabaseStorage implements IStorage {
               .set({
                 stock: sql`${products.stock} - ${item.quantity}`,
                 isSynced: false,
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date()
               })
               .where(eq(products.id, item.productId));
 
@@ -286,7 +286,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateSaleStatus(id: number, status: string): Promise<Sale | undefined> {
     const [sale] = await db.update(sales)
-      .set({ status, isSynced: false, updatedAt: new Date().toISOString() })
+      .set({ status, isSynced: false, updatedAt: new Date() })
       .where(eq(sales.id, id))
       .returning();
 
@@ -296,9 +296,9 @@ export class DatabaseStorage implements IStorage {
     return sale;
   }
 
-  async updateSaleEmailedAt(id: number, emailedAt: string): Promise<Sale | undefined> {
+  async updateSaleEmailedAt(id: number, emailedAt: Date): Promise<Sale | undefined> {
     const [sale] = await db.update(sales)
-      .set({ emailedAt, isSynced: false, updatedAt: new Date().toISOString() })
+      .set({ emailedAt, isSynced: false, updatedAt: new Date() })
       .where(eq(sales.id, id))
       .returning();
 
@@ -312,7 +312,7 @@ export class DatabaseStorage implements IStorage {
     const rows = await db
       .select()
       .from(sales)
-      .where(and(gte(sales.createdAt, start.toISOString()), lt(sales.createdAt, end.toISOString())));
+      .where(sql`created_at >= ${start} AND created_at < ${end}`);
 
     const totalAmount = rows.reduce((sum, r) => sum + Number(r.total), 0);
     return { totalAmount, count: rows.length };
@@ -331,7 +331,7 @@ export class DatabaseStorage implements IStorage {
   async updateEmployee(id: number, data: Partial<InsertEmployee>): Promise<Employee | undefined> {
     const [emp] = await db
       .update(employees)
-      .set({ ...data, isSynced: false, updatedAt: new Date().toISOString() })
+      .set({ ...data, isSynced: false, updatedAt: new Date() })
       .where(eq(employees.id, id))
       .returning();
     if (emp) await this.pushToSyncQueue('employees', 'UPDATE', emp.id, emp);
@@ -364,7 +364,7 @@ export class DatabaseStorage implements IStorage {
     if (existing) {
       const [updated] = await db
         .update(storeSettings)
-        .set({ value, isSynced: false, updatedAt: new Date().toISOString() })
+        .set({ value, isSynced: false, updatedAt: new Date() })
         .where(eq(storeSettings.key, key))
         .returning();
       if (updated) await this.pushToSyncQueue('store_settings', 'UPDATE', updated.id, updated);
@@ -408,7 +408,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePayroll(id: number, data: Partial<InsertPayroll>): Promise<Payroll | undefined> {
-    const [payroll] = await db.update(payrolls).set({ ...data, isSynced: false, updatedAt: new Date().toISOString() }).where(eq(payrolls.id, id)).returning();
+    const [payroll] = await db.update(payrolls).set({ ...data, isSynced: false, updatedAt: new Date() }).where(eq(payrolls.id, id)).returning();
     if (payroll) await this.pushToSyncQueue('payrolls', 'UPDATE', payroll.id, payroll);
     return payroll;
   }
@@ -435,7 +435,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCustomer(id: number, data: Partial<InsertCustomer>): Promise<Customer | undefined> {
-    const [customer] = await db.update(customers).set({ ...data, isSynced: false, updatedAt: new Date().toISOString() }).where(eq(customers.id, id)).returning();
+    const [customer] = await db.update(customers).set({ ...data, isSynced: false, updatedAt: new Date() }).where(eq(customers.id, id)).returning();
     if (customer) await this.pushToSyncQueue('customers', 'UPDATE', customer.id, customer);
     return customer;
   }
@@ -489,7 +489,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateQuote(id: number, updateData: Partial<InsertQuote>): Promise<Quote | undefined> {
-    const [quote] = await db.update(quotes).set({ ...updateData, isSynced: false, updatedAt: new Date().toISOString() }).where(eq(quotes.id, id)).returning();
+    const [quote] = await db.update(quotes).set({ ...updateData, isSynced: false, updatedAt: new Date() }).where(eq(quotes.id, id)).returning();
     if (quote) await this.pushToSyncQueue('quotes', 'UPDATE', quote.id, quote);
     return quote;
   }
@@ -511,7 +511,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSupplier(id: number, data: Partial<InsertSupplier>): Promise<Supplier | undefined> {
-    const [row] = await db.update(suppliers).set({ ...data, isSynced: false, updatedAt: new Date().toISOString() }).where(eq(suppliers.id, id)).returning();
+    const [row] = await db.update(suppliers).set({ ...data, isSynced: false, updatedAt: new Date() }).where(eq(suppliers.id, id)).returning();
     if (row) await this.pushToSyncQueue('suppliers', 'UPDATE', row.id, row);
     return row;
   }
@@ -557,9 +557,9 @@ export class DatabaseStorage implements IStorage {
 
   async updatePurchaseOrderStatus(id: number, status: string): Promise<PurchaseOrder | undefined> {
     return await db.transaction(async (tx) => {
-      const receiveDate = status === "Received" ? new Date().toISOString() : null;
+      const receiveDate = status === "Received" ? new Date() : null;
       const [po] = await tx.update(purchaseOrders)
-        .set({ status, receivedDate: receiveDate, isSynced: false, updatedAt: new Date().toISOString() })
+        .set({ status, receivedDate: receiveDate, isSynced: false, updatedAt: new Date() })
         .where(eq(purchaseOrders.id, id))
         .returning();
 
@@ -572,7 +572,7 @@ export class DatabaseStorage implements IStorage {
             await tx.update(products).set({
               stock: prod.stock + item.quantity,
               isSynced: false,
-              updatedAt: new Date().toISOString()
+              updatedAt: new Date()
             }).where(eq(products.id, prod.id));
 
             // we do NOT auto-queue the product update right away to simplify distributed queues, 
@@ -612,7 +612,7 @@ export class DatabaseStorage implements IStorage {
         await tx.update(products).set({
           stock: prod.stock + adj.quantityAdjusted,
           isSynced: false,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date()
         }).where(eq(products.id, prod.id));
       }
 
@@ -655,7 +655,7 @@ export class DatabaseStorage implements IStorage {
             await tx.update(products).set({
               stock: prod.stock + item.quantity,
               isSynced: false,
-              updatedAt: new Date().toISOString()
+              updatedAt: new Date()
             }).where(eq(products.id, prod.id));
           }
         }
@@ -757,7 +757,7 @@ export class DatabaseStorage implements IStorage {
       await this.pushToSyncQueue('tier_multipliers', 'INSERT', newTier.id, newTier);
       return newTier;
     }
-    const [updated] = await db.update(tierMultipliers).set({ multiplier, isSynced: false, updatedAt: new Date().toISOString() }).where(eq(tierMultipliers.tierName, tierName)).returning();
+    const [updated] = await db.update(tierMultipliers).set({ multiplier, isSynced: false, updatedAt: new Date() }).where(eq(tierMultipliers.tierName, tierName)).returning();
     await this.pushToSyncQueue('tier_multipliers', 'UPDATE', updated.id, updated);
     return updated;
   }
@@ -798,15 +798,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async endShift(id: number, actualCash: number, expectedCash: number, discrepancy: number): Promise<Shift | undefined> {
-    const now = new Date().toISOString();
     const [updated] = await db.update(shifts)
       .set({
-        endTime: now,
+        endTime: new Date().toISOString(),
         actualCash,
         expectedCash,
         discrepancy,
         status: 'Closed',
-        updatedAt: now
+        updatedAt: new Date()
       })
       .where(eq(shifts.id, id))
       .returning();

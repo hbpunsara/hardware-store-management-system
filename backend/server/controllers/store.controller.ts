@@ -12,6 +12,7 @@ const STORE_KEYS = [
   "receipt_footer",
   "receipt_print_logo",
   "tax_rate",
+  "tax_enabled",
   "tax_show_breakdown",
   "tax_inclusive",
   "printer_default",
@@ -30,6 +31,12 @@ const STORE_KEYS = [
   "notify_payroll",
   "database_backup_frequency",
   "database_keep_backups",
+  "payroll_setup_complete",
+  "payroll_epf_rate",
+  "payroll_etf_rate",
+  "payroll_tax_rate",
+  "payroll_allowances", // comma-separated default allowances
+  "payroll_deductions", // comma-separated default deductions
 ] as const;
 
 export const storeController = {

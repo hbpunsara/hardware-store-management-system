@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { notificationsService } from "../services/notificationsService";
 
 export const Navbar = ({ title, showSearch = false }) => {
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [syncStatus, setSyncStatus] = useState({ online: true, pendingItems: 0 });
 
   // Live notifications
@@ -57,56 +58,55 @@ export const Navbar = ({ title, showSearch = false }) => {
 
     checkStatus();
     fetchNotifications();
+    
     const interval = setInterval(() => {
       checkStatus();
       fetchNotifications();
-    }, 15000); // Check every 15 seconds
+      setCurrentTime(new Date());
+    }, 1000); // Check every second for the clock
     
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <header className="bg-white border-b-2 border-gray-100 px-6 py-4">
+    <header className="bg-white border-b border-gray-100 px-4 py-1.5 shrink-0">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button 
-            className="md:hidden p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors" 
+            className="md:hidden p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors" 
             onClick={() => document.dispatchEvent(new CustomEvent('toggleSidebar'))}
           >
-            <Menu className="w-6 h-6 text-gray-700" />
+            <Menu className="w-5 h-5 text-gray-700" />
           </button>
-          <div>
-            <h2 className="text-2xl font-extrabold text-gray-900">{title}</h2>
-            <p className="text-sm text-gray-500 font-medium hidden sm:block">Welcome back! Here's what's happening today.</p>
-          </div>
+          <h2 className="text-base font-extrabold text-gray-900">{title}</h2>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
           {showSearch && (
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search..."
-                className="nintendo-input pl-12 w-72"
+                className="nintendo-input pl-9 w-60 py-1.5 text-sm"
               />
             </div>
           )}
 
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-colors ${syncStatus.online ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {syncStatus.online ? <Cloud className="w-5 h-5" /> : <CloudOff className="w-5 h-5" />}
-            <span className="text-sm font-semibold">
+          <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs transition-colors ${syncStatus.online ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {syncStatus.online ? <Cloud className="w-4 h-4" /> : <CloudOff className="w-4 h-4" />}
+            <span className="font-semibold">
               {syncStatus.online ? 'Online' : 'Offline'}
-              {syncStatus.pendingItems > 0 && ` (${syncStatus.pendingItems} pending)`}
+              {syncStatus.pendingItems > 0 && ` (${syncStatus.pendingItems})`}
             </span>
           </div>
 
           <Popover>
             <PopoverTrigger asChild>
-              <button className="relative p-3 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors">
-                <Bell className="w-5 h-5 text-gray-600" />
+              <button className="relative p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <Bell className="w-4 h-4 text-gray-600" />
                 {notifications.filter(n => !n.isRead).length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#E60012] rounded-full flex items-center justify-center text-white text-xs font-bold">
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#E60012] rounded-full flex items-center justify-center text-white text-[9px] font-bold">
                     {notifications.filter(n => !n.isRead).length}
                   </span>
                 )}
@@ -156,9 +156,14 @@ export const Navbar = ({ title, showSearch = false }) => {
             </PopoverContent>
           </Popover>
 
-          <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-xl cursor-pointer hover:bg-gray-200 transition-colors">
-            <span className="text-sm font-semibold text-gray-700">Today</span>
-            <ChevronDown className="w-4 h-4 text-gray-500" />
+          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-gray-50 rounded-lg">
+            <span className="text-xs font-bold text-gray-700">
+              {currentTime.toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+            </span>
+            <span className="text-[10px] text-gray-400">|</span>
+            <span className="text-xs font-extrabold text-[#E60012] tabular-nums">
+              {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+            </span>
           </div>
         </div>
       </div>

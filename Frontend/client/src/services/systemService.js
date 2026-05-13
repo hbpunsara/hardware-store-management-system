@@ -32,6 +32,16 @@ export const systemService = {
     }
     return response.json();
   },
+  async syncNow() {
+    const response = await fetch("/api/system/sync", {
+      method: "POST",
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.message || "Failed to sync");
+    }
+    return response.json();
+  },
 };
 
 export default systemService;

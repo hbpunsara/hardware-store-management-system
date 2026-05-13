@@ -5,9 +5,69 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "set NODE_ENV=development && electron ."
+    "dev": "set NODE_ENV=development && electron .",
+    "dist": "electron-builder --win"
+  },
+  "build": {
+    "appId": "com.hardwarestore.pos",
+    "productName": "Hardware Store POS",
+    "directories": {
+      "output": "../release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      {
+        "from": "../backend/dist",
+        "to": "backend/dist",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../backend/package.json",
+        "to": "backend/package.json"
+      },
+      {
+        "from": "../backend/node_modules",
+        "to": "backend/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../backend/shared",
+        "to": "backend/shared",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../Frontend/dist",
+        "to": "Frontend/dist",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "asar": true,
+    "asarUnpack": [
+      "backend/dist/**/*",
+      "backend/node_modules/better-sqlite3/**/*"
+    ]
   },
   "devDependencies": {
-    "electron": "^40.0.0"
+    "electron": "^40.0.0",
+    "electron-builder": "^26.8.1"
   }
 }

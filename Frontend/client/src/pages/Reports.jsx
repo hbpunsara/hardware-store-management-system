@@ -2,11 +2,9 @@ import { useState, useEffect } from "react";
 import { Sidebar } from "../components/Sidebar";
 import { Navbar } from "../components/Navbar";
 import { Button } from "../components/Button";
-import { Modal } from "../components/Modal";
 import { useToast } from "../components/Toast";
 import {
   Download,
-  Calendar,
   TrendingUp,
   TrendingDown,
   BarChart3,
@@ -18,8 +16,7 @@ import {
   ArrowRight,
   Lightbulb,
   Clock,
-  Printer,
-  FileText
+  Printer
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -60,7 +57,7 @@ const ICON_MAP = {
   Lightbulb
 };
 
-const REPORT_COLORS = ["bg-[#E60012]", "bg-[#0AB5CD]", "bg-[#7AC143]", "bg-[#F5A623]"];
+
 
 export const Reports = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -70,11 +67,9 @@ export const Reports = () => {
   const [basketAnalysis, setBasketAnalysis] = useState([]);
   const [insights, setInsights] = useState([]);
   const [weeklyTrend, setWeeklyTrend] = useState([]);
+  const [productForecastData, setProductForecastData] = useState({ products: [] });
+  const [selectedProduct, setSelectedProduct] = useState("");
   const [loading, setLoading] = useState(true);
-  const [training, setTraining] = useState(false);
-  const [showDateModal, setShowDateModal] = useState(false);
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
   const toast = useToast();
 
   useEffect(() => {
@@ -84,13 +79,19 @@ export const Reports = () => {
       reportsService.getForecasting().catch(() => []),
       reportsService.getBasketAnalysis().catch(() => []),
       reportsService.getInsights().catch(() => []),
-      reportsService.getWeeklyTrend().catch(() => [])
-    ]).then(([overviewData, forecast, basket, ins, trend]) => {
+      reportsService.getWeeklyTrend().catch(() => []),
+      reportsService.getProductForecasting().catch(() => ({ products: [] }))
+    ]).then(([overviewData, forecast, basket, ins, trend, productForecast]) => {
       setOverview(overviewData);
       setForecastData(forecast);
       setBasketAnalysis(basket);
       setInsights(ins);
       setWeeklyTrend(trend);
+      setProductForecastData(productForecast || { products: [] });
+      // Auto-select the first (top-selling) product
+      if (productForecast?.products?.length > 0) {
+        setSelectedProduct(productForecast.products[0].name);
+      }
       setLoading(false);
     });
   }, []);
@@ -128,58 +129,10 @@ export const Reports = () => {
     }
   };
 
-  const handleTrainML = async () => {
-    try {
-      setTraining(true);
-      toast.success("Training ML models. This may take a moment...");
-      await reportsService.trainML();
-      toast.success("ML Models trained successfully!");
-      const [forecast, basket] = await Promise.all([
-        reportsService.getForecasting().catch(() => []),
-        reportsService.getBasketAnalysis().catch(() => [])
-      ]);
-      setForecastData(forecast);
-      setBasketAnalysis(basket);
-    } catch (err) {
-      toast.error(err.message || "Failed to train ML models");
-    } finally {
-      setTraining(false);
-    }
-  };
 
-  const handleExportCSV = () => {
-    try {
-      const rows = ["Product,Units Sold,Revenue (LKR),Margin %"];
-      topProducts.forEach(p =>
-        rows.push(`"${p.name}",${p.sales},${(p.revenue ?? 0).toFixed(2)},${p.trend}`)
-      );
-      const blob = new Blob([rows.join("\n")], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `sales-report-${new Date().toISOString().split("T")[0]}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-      toast.success("CSV exported!");
-    } catch {
-      toast.error("Failed to export CSV");
-    }
-  };
 
   const handlePrint = () => window.print();
 
-  const handleApplyDateRange = () => {
-    if (!dateFrom || !dateTo) {
-      toast.error("Please select both start and end dates");
-      return;
-    }
-    if (new Date(dateFrom) > new Date(dateTo)) {
-      toast.error("Start date must be before end date");
-      return;
-    }
-    setShowDateModal(false);
-    toast.success(`Showing data from ${dateFrom} to ${dateTo}`);
-  };
 
   // Filter trend data based on period
   const getTrendData = () => {
@@ -202,36 +155,26 @@ export const Reports = () => {
         <Navbar title="Reports & Analytics" />
 
         <div className="p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              {["overview", "seasonal analysis", "basket analysis", "insights"].map((tab) => (
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+            <div className="flex flex-wrap gap-2">
+              {["overview", "product forecasting", "seasonal analysis", "basket analysis", "insights"].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-5 py-2.5 rounded-xl font-bold capitalize transition-all ${activeTab === tab
+                  className={`px-5 py-2.5 rounded-xl font-bold capitalize transition-all whitespace-nowrap ${activeTab === tab
                     ? "bg-[#E60012] text-white shadow-lg"
-                    : "bg-white text-gray-700 hover:bg-gray-50"
+                    : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-100"
                     }`}
                 >
                   {tab}
                 </button>
               ))}
             </div>
-            <div className="flex gap-3 no-print">
-              <Button variant="secondary" onClick={handleTrainML} disabled={training}>
-                <Brain className={`w-4 h-4 mr-2 ${training ? 'animate-pulse' : ''}`} /> 
-                {training ? 'Training...' : 'Retrain ML Models'}
-              </Button>
-              <Button variant="secondary" onClick={() => setShowDateModal(true)}>
-                <Calendar className="w-4 h-4 mr-2" /> Date Range
-              </Button>
-              <Button variant="secondary" onClick={handleExportCSV}>
-                <FileText className="w-4 h-4 mr-2" /> Export CSV
-              </Button>
-              <Button variant="secondary" onClick={handlePrint}>
+            <div className="flex flex-wrap gap-2 no-print">
+              <Button variant="secondary" onClick={handlePrint} className="whitespace-nowrap">
                 <Printer className="w-4 h-4 mr-2" /> Print Report
               </Button>
-              <Button onClick={handleExportAll}>
+              <Button onClick={handleExportAll} className="whitespace-nowrap">
                 <Download className="w-4 h-4 mr-2" /> Export All
               </Button>
             </div>
@@ -245,7 +188,11 @@ export const Reports = () => {
                     <div className="w-12 h-12 bg-[#7AC143]/10 rounded-xl flex items-center justify-center">
                       <TrendingUp className="w-6 h-6 text-[#7AC143]" />
                     </div>
-                    <span className="nintendo-badge nintendo-badge-success">+18.2%</span>
+                    {!loading && (
+                      <span className={`nintendo-badge ${(overview?.revenueChange ?? 0) >= 0 ? 'nintendo-badge-success' : 'nintendo-badge-danger'}`}>
+                        {(overview?.revenueChange ?? 0) >= 0 ? '+' : ''}{overview?.revenueChange ?? 0}%
+                      </span>
+                    )}
                   </div>
                   <p className="text-3xl font-extrabold text-gray-900">
                     {loading ? "..." : `LKR ${(overview?.monthlyRevenue ?? 0).toLocaleString()}`}
@@ -257,7 +204,11 @@ export const Reports = () => {
                     <div className="w-12 h-12 bg-[#0AB5CD]/10 rounded-xl flex items-center justify-center">
                       <Activity className="w-6 h-6 text-[#0AB5CD]" />
                     </div>
-                    <span className="nintendo-badge nintendo-badge-success">+12.5%</span>
+                    {!loading && (
+                      <span className={`nintendo-badge ${(overview?.transactionChange ?? 0) >= 0 ? 'nintendo-badge-success' : 'nintendo-badge-danger'}`}>
+                        {(overview?.transactionChange ?? 0) >= 0 ? '+' : ''}{overview?.transactionChange ?? 0}%
+                      </span>
+                    )}
                   </div>
                   <p className="text-3xl font-extrabold text-gray-900">
                     {loading ? "..." : (overview?.totalTransactions ?? 0)}
@@ -269,7 +220,11 @@ export const Reports = () => {
                     <div className="w-12 h-12 bg-[#E60012]/10 rounded-xl flex items-center justify-center">
                       <BarChart3 className="w-6 h-6 text-[#E60012]" />
                     </div>
-                    <span className="nintendo-badge nintendo-badge-warning">-2.1%</span>
+                    {!loading && (
+                      <span className={`nintendo-badge ${(overview?.avgChange ?? 0) >= 0 ? 'nintendo-badge-success' : 'nintendo-badge-danger'}`}>
+                        {(overview?.avgChange ?? 0) >= 0 ? '+' : ''}{overview?.avgChange ?? 0}%
+                      </span>
+                    )}
                   </div>
                   <p className="text-3xl font-extrabold text-gray-900">
                     {loading ? "..." : `LKR ${(overview?.avgOrderValue ?? 0).toFixed(2)}`}
@@ -397,6 +352,287 @@ export const Reports = () => {
               </div>
             </>
           )}
+
+          {activeTab === "product forecasting" && (() => {
+            const products = productForecastData?.products || [];
+            const currentProduct = products.find(p => p.name === selectedProduct);
+
+            // Build chart data for selected product (history + forecast combined)
+            const chartData = [];
+            if (currentProduct) {
+              (currentProduct.history || []).forEach(h => {
+                chartData.push({ month: h.month, actual: h.qty, predicted: null });
+              });
+              (currentProduct.forecast || []).forEach(f => {
+                chartData.push({ month: f.month, actual: null, predicted: f.qty });
+              });
+            }
+
+            const growingProducts = products.filter(p => p.trend === "growing").slice(0, 5);
+            const decliningProducts = products.filter(p => p.trend === "declining").slice(0, 5);
+            const totalTracked = products.length;
+            const topProduct = products.length > 0 ? products[0] : null;
+            const avgDemand = products.length > 0
+              ? Math.round(products.reduce((s, p) => s + (p.avgMonthly || 0), 0) / products.length)
+              : 0;
+
+            return (
+              <div className="space-y-6">
+                {/* Summary Stats */}
+                <div className="grid grid-cols-3 gap-5">
+                  <div className="nintendo-stat-card">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-[#9B59B6]/10 rounded-xl flex items-center justify-center">
+                        <BarChart3 className="w-5 h-5 text-[#9B59B6]" />
+                      </div>
+                      <span className="font-bold text-gray-900">Products Tracked</span>
+                    </div>
+                    <p className="text-2xl font-extrabold text-[#9B59B6]">
+                      {loading ? "..." : totalTracked}
+                    </p>
+                    <p className="text-sm text-gray-500">With sales history data</p>
+                  </div>
+                  <div className="nintendo-stat-card">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-[#7AC143]/10 rounded-xl flex items-center justify-center">
+                        <TrendingUp className="w-5 h-5 text-[#7AC143]" />
+                      </div>
+                      <span className="font-bold text-gray-900">Top Product</span>
+                    </div>
+                    <p className="text-xl font-extrabold text-[#7AC143] truncate">
+                      {loading ? "..." : (topProduct?.name || "—")}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {topProduct ? `${topProduct.totalSold} units total` : "No data yet"}
+                    </p>
+                  </div>
+                  <div className="nintendo-stat-card">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-[#0AB5CD]/10 rounded-xl flex items-center justify-center">
+                        <Activity className="w-5 h-5 text-[#0AB5CD]" />
+                      </div>
+                      <span className="font-bold text-gray-900">Avg Monthly Demand</span>
+                    </div>
+                    <p className="text-2xl font-extrabold text-[#0AB5CD]">
+                      {loading ? "..." : `${avgDemand} units`}
+                    </p>
+                    <p className="text-sm text-gray-500">Across all products</p>
+                  </div>
+                </div>
+
+                {/* Product Selector + Chart */}
+                <div className="nintendo-card p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-[#E60012]/10 rounded-xl flex items-center justify-center">
+                        <Brain className="w-6 h-6 text-[#E60012]" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-xl text-gray-900">Product Demand Forecast</h3>
+                        <p className="text-sm text-gray-500">Per-product quantity prediction using ML moving average</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="nintendo-badge bg-[#E60012]/10 text-[#E60012]">
+                        <Zap className="w-3 h-3 mr-1" /> ML Powered
+                      </span>
+                      <select
+                        id="product-forecast-selector"
+                        value={selectedProduct}
+                        onChange={(e) => setSelectedProduct(e.target.value)}
+                        className="px-4 py-2 bg-white border border-gray-200 rounded-xl font-semibold text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-[#E60012]/20 focus:border-[#E60012] max-w-[240px] truncate"
+                      >
+                        {products.map((p) => (
+                          <option key={p.name} value={p.name}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {chartData.length === 0 ? (
+                    <div className="h-72 flex items-center justify-center text-gray-400 text-sm">
+                      {loading ? "Loading…" : "No product forecast data available. Make some sales first."}
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={320}>
+                      <LineChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fontWeight: 600, fill: "#6B7280" }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} width={42}
+                          label={{ value: "Qty Sold", angle: -90, position: "insideLeft", offset: 10, style: { fontSize: 11, fill: "#9CA3AF" } }} />
+                        <Tooltip content={<ChartTooltip isCurrency={false} />} />
+                        <Legend formatter={v => <span style={{ fontSize: 12, color: "#6B7280" }}>{v}</span>} />
+                        <Line type="monotone" dataKey="actual" name="Actual Qty" stroke="#E60012" strokeWidth={2.5}
+                          dot={{ r: 5, fill: "#E60012", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7 }} connectNulls={false} />
+                        <Line type="monotone" dataKey="predicted" name="Forecasted Qty" stroke="#9B59B6" strokeWidth={2.5}
+                          strokeDasharray="6 3" dot={{ r: 5, fill: "#9B59B6", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 7 }} connectNulls={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+
+                  {/* Current product stats bar */}
+                  {currentProduct && (
+                    <div className="mt-4 grid grid-cols-4 gap-4">
+                      <div className="bg-gray-50 rounded-xl p-3 text-center">
+                        <p className="text-xs text-gray-500 font-medium">Total Sold</p>
+                        <p className="text-lg font-extrabold text-gray-900">{currentProduct.totalSold}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-xl p-3 text-center">
+                        <p className="text-xs text-gray-500 font-medium">Avg/Month</p>
+                        <p className="text-lg font-extrabold text-gray-900">{currentProduct.avgMonthly}</p>
+                      </div>
+                      <div className="bg-gray-50 rounded-xl p-3 text-center">
+                        <p className="text-xs text-gray-500 font-medium">Trend</p>
+                        <p className={`text-lg font-extrabold ${currentProduct.trend === 'growing' ? 'text-[#7AC143]' : currentProduct.trend === 'declining' ? 'text-[#E60012]' : 'text-[#F5A623]'}`}>
+                          {currentProduct.trend === 'growing' ? '📈 Growing' : currentProduct.trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 rounded-xl p-3 text-center">
+                        <p className="text-xs text-gray-500 font-medium">Growth</p>
+                        <p className={`text-lg font-extrabold ${(currentProduct.growthPct || 0) >= 0 ? 'text-[#7AC143]' : 'text-[#E60012]'}`}>
+                          {(currentProduct.growthPct || 0) >= 0 ? '+' : ''}{currentProduct.growthPct || 0}%
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Growing and Declining Products */}
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Top Growing Products */}
+                  <div className="nintendo-card p-6">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="w-10 h-10 bg-[#7AC143]/10 rounded-xl flex items-center justify-center">
+                        <TrendingUp className="w-5 h-5 text-[#7AC143]" />
+                      </div>
+                      <h4 className="font-bold text-lg text-gray-900">Top Growing Products</h4>
+                    </div>
+                    {growingProducts.length === 0 ? (
+                      <p className="text-gray-400 text-sm py-4 text-center">No products with growing demand detected yet.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {growingProducts.map((p, i) => (
+                          <div key={i} className="flex items-center justify-between p-3 bg-[#7AC143]/5 rounded-xl cursor-pointer hover:bg-[#7AC143]/10 transition-all"
+                            onClick={() => setSelectedProduct(p.name)}>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-[#7AC143]/20 rounded-lg flex items-center justify-center font-bold text-[#7AC143] text-sm">
+                                #{i + 1}
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-900 text-sm">{p.name}</p>
+                                <p className="text-xs text-gray-500">{p.avgMonthly} avg/mo</p>
+                              </div>
+                            </div>
+                            <span className="nintendo-badge nintendo-badge-success flex items-center gap-1">
+                              <TrendingUp className="w-3 h-3" />
+                              +{p.growthPct || 0}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Declining Demand Alerts */}
+                  <div className="nintendo-card p-6">
+                    <div className="flex items-center gap-3 mb-5">
+                      <div className="w-10 h-10 bg-[#E60012]/10 rounded-xl flex items-center justify-center">
+                        <TrendingDown className="w-5 h-5 text-[#E60012]" />
+                      </div>
+                      <h4 className="font-bold text-lg text-gray-900">Declining Demand Alerts</h4>
+                    </div>
+                    {decliningProducts.length === 0 ? (
+                      <div className="text-center py-4">
+                        <div className="w-12 h-12 bg-[#7AC143]/10 rounded-xl flex items-center justify-center mx-auto mb-2">
+                          <Target className="w-6 h-6 text-[#7AC143]" />
+                        </div>
+                        <p className="text-gray-500 text-sm font-medium">All products are healthy!</p>
+                        <p className="text-gray-400 text-xs">No declining demand patterns detected.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {decliningProducts.map((p, i) => (
+                          <div key={i} className="flex items-center justify-between p-3 bg-[#E60012]/5 rounded-xl cursor-pointer hover:bg-[#E60012]/10 transition-all"
+                            onClick={() => setSelectedProduct(p.name)}>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-[#E60012]/20 rounded-lg flex items-center justify-center">
+                                <TrendingDown className="w-4 h-4 text-[#E60012]" />
+                              </div>
+                              <div>
+                                <p className="font-bold text-gray-900 text-sm">{p.name}</p>
+                                <p className="text-xs text-gray-500">{p.avgMonthly} avg/mo · Consider reducing stock</p>
+                              </div>
+                            </div>
+                            <span className="nintendo-badge nintendo-badge-danger flex items-center gap-1">
+                              {p.growthPct || 0}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* All Products Forecast Table */}
+                <div className="nintendo-card p-6">
+                  <h3 className="font-bold text-xl text-gray-900 mb-5">All Products Forecast Summary</h3>
+                  <table className="nintendo-table">
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>Total Sold</th>
+                        <th>Avg/Month</th>
+                        <th>Next Month Forecast</th>
+                        <th>Trend</th>
+                        <th>Growth</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loading ? (
+                        <tr><td colSpan={6} className="text-center py-8 text-gray-500">Loading...</td></tr>
+                      ) : products.length === 0 ? (
+                        <tr><td colSpan={6} className="text-center py-8 text-gray-500">No product sales data yet. Make some sales to generate forecasts.</td></tr>
+                      ) : products.map((p, i) => (
+                        <tr key={i} className={`cursor-pointer transition-all ${selectedProduct === p.name ? 'bg-[#E60012]/5' : 'hover:bg-gray-50'}`}
+                          onClick={() => setSelectedProduct(p.name)}>
+                          <td>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center font-bold text-gray-500 text-xs">
+                                #{i + 1}
+                              </div>
+                              <span className="font-bold text-gray-900">{p.name}</span>
+                            </div>
+                          </td>
+                          <td className="font-semibold text-gray-700">{p.totalSold}</td>
+                          <td className="font-semibold text-gray-700">{p.avgMonthly}</td>
+                          <td className="font-bold text-gray-900">
+                            {p.forecast?.[0]?.qty ?? "—"} units
+                          </td>
+                          <td>
+                            <span className={`nintendo-badge flex items-center gap-1 w-fit ${
+                              p.trend === 'growing' ? 'nintendo-badge-success' :
+                              p.trend === 'declining' ? 'nintendo-badge-danger' :
+                              'bg-[#F5A623]/10 text-[#F5A623]'
+                            }`}>
+                              {p.trend === 'growing' ? <TrendingUp className="w-3 h-3" /> :
+                               p.trend === 'declining' ? <TrendingDown className="w-3 h-3" /> :
+                               <Activity className="w-3 h-3" />}
+                              {p.trend}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`font-bold ${(p.growthPct || 0) >= 0 ? 'text-[#7AC143]' : 'text-[#E60012]'}`}>
+                              {(p.growthPct || 0) >= 0 ? '+' : ''}{p.growthPct || 0}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
 
           {activeTab === "seasonal analysis" && (
             <div className="space-y-6">
@@ -607,35 +843,7 @@ export const Reports = () => {
         </div>
       </main>
 
-      {/* Date Range Modal */}
-      <Modal isOpen={showDateModal} onClose={() => setShowDateModal(false)} title="Select Date Range" size="sm">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">From Date</label>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="nintendo-input w-full"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">To Date</label>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="nintendo-input w-full"
-            />
-          </div>
-          <div className="flex gap-3 justify-end pt-2">
-            <Button variant="secondary" onClick={() => setShowDateModal(false)}>Cancel</Button>
-            <Button onClick={handleApplyDateRange}>
-              <Calendar className="w-4 h-4 mr-2" /> Apply Range
-            </Button>
-          </div>
-        </div>
-      </Modal>
+
     </div>
   );
 };

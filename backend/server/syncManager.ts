@@ -45,6 +45,17 @@ export async function processSyncQueue() {
                         if (item.operation === 'INSERT') await remoteDb.insert(pg.employees).values(payload).onConflictDoNothing();
                         else if (item.operation === 'UPDATE') await remoteDb.update(pg.employees).set(payload).where(eq(pg.employees.id, Number(item.recordId)));
                         break;
+
+                    case 'customers':
+                        if (item.operation === 'INSERT') await remoteDb.insert(pg.customers).values(payload).onConflictDoNothing();
+                        else if (item.operation === 'UPDATE') await remoteDb.update(pg.customers).set(payload).where(eq(pg.customers.id, Number(item.recordId)));
+                        else if (item.operation === 'DELETE') await remoteDb.delete(pg.customers).where(eq(pg.customers.id, Number(item.recordId)));
+                        break;
+
+                    case 'quotes':
+                        if (item.operation === 'INSERT') await remoteDb.insert(pg.quotes).values(payload).onConflictDoNothing();
+                        else if (item.operation === 'UPDATE') await remoteDb.update(pg.quotes).set(payload).where(eq(pg.quotes.id, Number(item.recordId)));
+                        break;
                 }
 
                 // 3. Mark successful in local queue by deleting it

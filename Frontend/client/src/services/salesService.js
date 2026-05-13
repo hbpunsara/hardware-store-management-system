@@ -48,6 +48,17 @@ export const salesService = {
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || "Failed to email invoice");
     return data;
+  },
+
+  async printReceipt(receiptData) {
+    const response = await fetch("/api/printer/receipt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ receiptData }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Hardware printing failed");
+    return data;
   }
 };
 
