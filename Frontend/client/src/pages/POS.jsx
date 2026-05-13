@@ -574,7 +574,10 @@ export const POS = () => {
           setShowCustomerModal(true);
           break;
         case 'F4':
-          if (cart.length > 0) setShowParkModal(true);
+          if (cart.length > 0) {
+            setParkSaleName(`Sale-${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+            setShowParkModal(true);
+          }
           break;
         case 'F5':
           openRecallModal();
@@ -737,7 +740,12 @@ export const POS = () => {
             
             {/* Utility Buttons aligned to the right */}
             <div className="flex items-center gap-1.5">
-              <Button variant="secondary" size="sm" className="h-8 text-[10px] px-2" onClick={() => setShowParkModal(true)} disabled={cart.length === 0}>
+              <Button variant="secondary" size="sm" className="h-8 text-[10px] px-2" 
+                onClick={() => {
+                  setParkSaleName(`Sale-${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+                  setShowParkModal(true);
+                }} 
+                disabled={cart.length === 0}>
                 <Save className="w-3 h-3 mr-1" /> Park
               </Button>
               <Button variant="secondary" size="sm" className="h-8 text-[10px] px-2" onClick={openRecallModal}>
@@ -859,7 +867,7 @@ export const POS = () => {
                 </div>
 
                 <div className="flex items-center justify-between mb-2 shrink-0 gap-1.5">
-                  <h3 className="font-bold text-sm text-gray-900 uppercase tracking-tighter">Current Cart</h3>
+                  <h3 className="font-bold text-sm text-gray-900 uppercase tracking-tighter">Cart</h3>
                   <div className="flex items-center gap-1.5">
                     <Button variant="secondary" size="sm" onClick={() => setShowCustomItemModal(true)}>
                       <Plus className="w-3.5 h-3.5 mr-0.5" /> Custom
@@ -1321,15 +1329,22 @@ export const POS = () => {
               <label className="text-sm font-bold text-gray-700 block mb-1">Reference Name</label>
               <input
                 type="text"
+                autoFocus
                 placeholder="e.g. John's Layaway"
                 className="nintendo-input w-full"
                 value={parkSaleName}
                 onChange={e => setParkSaleName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && parkSaleName.trim()) handleParkSale();
+                }}
               />
+              <p className="text-[10px] text-gray-400 mt-1">Press Enter to park immediately</p>
             </div>
             <div className="flex gap-3 justify-end pt-4">
               <Button variant="secondary" onClick={() => setShowParkModal(false)}>Cancel</Button>
-              <Button onClick={handleParkSale} disabled={processing || !parkSaleName.trim()}>Park Sale</Button>
+              <Button onClick={handleParkSale} disabled={processing || !parkSaleName.trim()}>
+                {processing ? "Parking..." : "Park Sale"}
+              </Button>
             </div>
           </div>
         </Modal>
