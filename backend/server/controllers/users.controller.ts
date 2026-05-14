@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { storage } from "../storage";
+import bcrypt from "bcryptjs";
 
 const roleDisplay: Record<string, string> = {
   admin: "Administrator",
@@ -48,9 +49,10 @@ export const usersController = {
         suffix++;
         username = `${baseUsername}${suffix}`;
       }
+      const hashedPassword = await bcrypt.hash(String(password), 10);
       const row = await storage.createUser({
         username,
-        password: String(password),
+        password: hashedPassword,
         name: String(name).trim(),
         role: role ? String(role).toLowerCase() : "cashier",
         email: String(email).trim(),
@@ -74,7 +76,9 @@ export const usersController = {
       if (name) updateData.name = String(name).trim();
       if (email) updateData.email = String(email).trim();
       if (role) updateData.role = String(role).toLowerCase();
-      if (password) updateData.password = String(password);
+      if (password) {
+        updateData.password = await bcrypt.hash(String(password), 10);
+      }
 
       let userRow;
       if (Object.keys(updateData).length > 0) {

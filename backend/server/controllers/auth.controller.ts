@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { storage } from "../storage";
 
 import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
 
 const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_key";
 
@@ -10,7 +11,12 @@ export const authController = {
     const { username, password } = req.body;
     const user = await storage.getUserByUsername(username);
 
-    if (!user || user.password !== password) {
+    if (!user) {
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 

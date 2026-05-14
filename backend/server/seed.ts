@@ -3,16 +3,22 @@ import { eq } from "drizzle-orm";
 import { db } from "./db";
 import { users, products, employees, storeSettings, notifications, promotions, loyaltyLedger, shifts, customers } from "../shared/schema";
 
+import bcrypt from "bcryptjs";
+
 export async function runSeeds() {
   console.log("Checking if seeding is needed...");
   const existingUsers = await db.select().from(users);
   if (existingUsers.length === 0) {
+    const adminPassword = await bcrypt.hash("admin123", 10);
+    const cashierPassword = await bcrypt.hash("cashier123", 10);
+    const inventoryPassword = await bcrypt.hash("inv123", 10);
+
     await db.insert(users).values([
-      { username: "admin", password: "admin123", name: "Admin User", role: "admin" },
-      { username: "cashier", password: "cashier123", name: "Priya Sharma", role: "cashier" },
-      { username: "inventory", password: "inv123", name: "Robert Fernando", role: "inventory_manager" },
+      { username: "admin", password: adminPassword, name: "Admin User", role: "admin" },
+      { username: "cashier", password: cashierPassword, name: "Priya Sharma", role: "cashier" },
+      { username: "inventory", password: inventoryPassword, name: "Robert Fernando", role: "inventory_manager" },
     ]);
-    console.log("Seeded users: admin, cashier");
+    console.log("Seeded users: admin, cashier, inventory");
   }
 
   const existingProducts = await db.select().from(products);
@@ -102,7 +108,7 @@ export async function runSeeds() {
 }
 
 // Keep the CLI execution support
-if (process.argv[1] && process.argv[1].endsWith('seed.js')) {
+if (process.argv[1] && (process.argv[1].endsWith('seed.js') || process.argv[1].endsWith('seed.ts'))) {
   runSeeds().then(() => {
     console.log("Seed finished");
     process.exit(0);

@@ -97,9 +97,6 @@ export const Login = () => {
               </Button>
             </form>
 
-            <p className="text-center text-gray-500 text-sm mt-6">
-              Default: admin / admin123 or cashier / cashier123
-            </p>
           </div>
         </div>
       </div>
