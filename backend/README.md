@@ -1,53 +1,57 @@
-# Backend - Hardware Store Management System
+# 🖥️ Hardware Store Backend
 
-This directory contains the REST API server and database logic for the Hardware Store Management System.
+The mission-critical engine powering the Hardware Store Management System. This server is designed for high reliability, strict type safety, and seamless cloud synchronization.
 
-## Architecture
+---
 
-The backend is a monolithic server running **Node.js** with **Express.js**, heavily leveraging TypeScript for memory-safe development. Relational database connectivity is managed via **Drizzle ORM**.
+## ⚙️ Core Architecture
 
-### Key Tools & Libraries
-- **Express.js**: The HTTP web framework parsing routes and payloads.
-- **Drizzle ORM**: A headless, type-safe data mapper mapped tightly against a PostgreSQL engine.
-- **PostgreSQL**: The relational data store handling complex joins (Transactions, Sub-items, Payroll records).
-- **Zod**: Runtime schema validation enforcing strict types before DB writing operations.
-- **esbuild**: An extremely fast JS bundler used to output the production executable script.
+### 1. Dual-Database Connectivity (`db.ts`)
+The backend maintains two connection pools:
+- **Primary Pool**: Connects to the local PostgreSQL instance for zero-latency operations.
+- **Remote Pool**: Connects to the Supabase cloud instance for persistence and multi-site synchronization.
 
-## Project Structure
+### 2. Synchronization Daemon (`syncManager.ts`)
+Every data-modifying operation logs a record to the `sync_queue` table. A background daemon polls this queue every 15 seconds and reconciles changes with the remote database, ensuring your data is always safe in the cloud even during internet outages.
 
+### 3. Data Access Layer (`storage.ts`)
+We use a centralized Storage class that abstracts all database interactions. This ensures that the business logic in controllers remains clean and decoupled from the ORM implementation.
+
+---
+
+## 🛠️ API Modules
+
+- **Auth**: JWT-based authentication with Bcrypt password hashing.
+- **Products**: Full inventory lifecycle management including category filtering and stock reconciliation.
+- **Sales**: Transactional POS logic that handles stock deduction, tax calculation, and loyalty point issuance atomically.
+- **Payroll**: Automated calculation of earnings based on attendance logs and staff configuration.
+- **Reports**: Aggregate data generation for financial performance and inventory turnover.
+
+---
+
+## 🚀 Running the Backend
+
+### Development Mode
+```bash
+npm install
+npm run dev
 ```
-backend/
-├── server/
-│   ├── controllers/      # Route logic handlers (Products, Employees, Payroll, Reports, etc.)
-│   ├── db.ts             # Instantiating the Postgres client and binding Drizzle
-│   ├── index.ts          # Express start up script
-│   ├── routes.ts         # Central HTTP method binding returning API endpoints
-│   └── storage.ts        # The centralized Data Access Object providing direct queries/insertions
-├── shared/
-│   └── schema.ts         # The absolute source of truth: defining SQL Tables and Exporting Zod Types
-├── package.json          # Node dependencies and execution scripts
-├── drizzle.config.ts     # Drizzle studio configuration
-└── .env                  # Environment secrets containing database connection string
+
+### Database Management
+```bash
+# Push schema changes to Postgres
+npx drizzle-kit push
+
+# Seed default users and products
+npx tsx server/seed.ts
+
+# Open Drizzle Studio to browse data
+npm run db:studio
 ```
 
-## Core Domain Models
+---
 
-- **Users**: Admin, Cashier, Inventory Managers authenticated credentials.
-- **Employees**: Staff personnel details, status, and role tracking.
-- **Products & Inventory**: SKUs, Categories, Supplier linkage, and quantity monitoring.
-- **Sales & Sale Items**: 1-to-many relationship linking a checkout transaction to exact items bought.
-- **Payrolls**: Automated dynamic generation of employee salary records for specific months.
-- **Transactions (Finance)**: Broad ledger of arbitrary store revenues and operational expenses.
-
-## Available Scripts
-
-From the `backend` directory, you can run:
-
-- `npm run dev`: Starts the dev server using `tsx` (hot-reloads TS natively). Usually runs on port `5000`.
-- `npm run db:push`: Synchronizes your defined Drizzle `schema.ts` tables with your live PostgreSQL instance natively.
-- `npm run db:seed`: Populates the database with initial mock data sets for testing purposes.
-- `npm run build`: Bundles the `server/index.ts` map into standard Node ECMAScript module outputs via esbuild.
-- `npm start`: Runs the built production `dist/index.js` application.
-
-## API Note
-Ensure `DATABASE_URL` is configured in your local `.env` file before executing any startup or database push commands.
+## 🔒 Security
+- **JWT Auth**: All sensitive endpoints require a valid Bearer token.
+- **Zod Validation**: Every request body is validated against a schema before being processed.
+- **SSL**: Remote connections are secured via SSL with certificate validation (configurable via `NODE_TLS_REJECT_UNAUTHORIZED`).

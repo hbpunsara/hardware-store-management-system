@@ -1,45 +1,52 @@
-# Frontend - Hardware Store Management System
+# 🎨 Hardware Store Frontend
 
-This directory contains the user interface and client-side logic for the Hardware Store Management System.
+A high-performance, premium user interface built with **React** and **Vite**. The design follows a high-density, "Nintendo-inspired" aesthetic, optimized for professional hardware store environments.
 
-## Architecture
+---
 
-The frontend is a Single-Page Application (SPA) built with **React** and powered by **Vite** for incredibly fast Hot Module Replacement (HMR) and optimized production builds.
+## ✨ UI Design System
 
-### Key Tools & Libraries
-- **React 18**: The core framework providing reactive, component-based UIs.
-- **Tailwind CSS**: A utility-first CSS framework for rapid UI styling, coupled with `tw-animate-css` for animations.
-- **Wouter**: A minimalist routing library for navigating between pages without refreshing.
-- **Radix UI**: Unstyled, accessible component primitives (modals, dialogs, sliders) that form the baseline of custom components.
-- **Lucide React**: Clean and beautiful SVG icons.
-- **TanStack React Query**: Used for data fetching, caching, and state synchronization with the backend API.
+### 1. Aesthetics
+- **High Contrast**: Vibrant reds and deep dark modes for maximum legibility.
+- **Glassmorphism**: Subtle translucency and blurred backgrounds for a modern, layered feel.
+- **Interactive Micro-animations**: Powered by **Framer Motion** for a responsive, "alive" experience.
+- **Responsive Layout**: Designed for 1400x900 viewport but fully responsive for tablets and smaller screens.
 
-## Project Structure (Client)
+### 2. Core Components
+- **Sidebar**: Viewport-locked navigation with active state tracking.
+- **POS Terminal**: A heavy-duty checkout interface with dynamic cart logic and keyboard shortcut support.
+- **Dashboard Stats**: Real-time KPI tracking using custom SVG icons and data visualization.
 
+---
+
+## 🛠️ Technical Implementation
+
+- **State Management**: React Context API for Global Auth and Theme state.
+- **Routing**: `wouter` for lightweight, fast page transitions.
+- **Styling**: **Tailwind CSS** with custom configuration for the "Nintendo" design tokens.
+- **Form Handling**: **React Hook Form** + **Zod** for real-time validation.
+- **Icons**: **Lucide React** for consistent, stroke-based iconography.
+
+---
+
+## 🚀 Running the Frontend
+
+### Development
+```bash
+npm install
+npm run dev
 ```
-Frontend/
-├── client/
-│   ├── src/
-│   │   ├── components/  # Reusable UI elements (Buttons, Layout components, Cards)
-│   │   ├── context/     # Application-wide React Contexts (e.g., AuthContext)
-│   │   ├── pages/       # Distinct route screens (Dashboard, POS, Finance, etc.)
-│   │   ├── services/    # Pure JavaScript modules wrapping native `fetch()` calls to the backend
-│   │   ├── App.tsx      # Core application shell and router configuration
-│   │   └── main.tsx     # React rendering entry
-│   ├── public/          # Static assets
-│   └── index.html       # Vite HTML entry point
-├── package.json         # Frontend dependencies and scripts
-└── vite.config.ts       # Vite bundler configurations
+
+### Build for Production
+```bash
+npm run build
 ```
 
-## Available Scripts
+---
 
-From the `Frontend` directory, you can run:
-
-- `npm run dev`: Starts the Vite development server (usually on HTTP port `5173`).
-- `npm run build`: Compiles and bundles the application for production deployment into the `client/dist` directory.
-- `npm run check`: Runs the TypeScript compiler to check for type issues.
-- `npm run preview`: Previews the compiled production build locally.
-
-## Design Aesthetic
-The dashboard components and UI cards feature a distinctive, clean red-and-white custom theme (referred to as the "Nintendo" aesthetic in the source code). This ensures high contrast and clarity for store operators out on the store floor.
+## 📂 Key Folders
+- `/src/components`: Reusable UI primitives (Buttons, Modals, Cards).
+- `/src/pages`: Main application views (Dashboard, POS, Inventory, Payroll).
+- `/src/context`: Global application state providers.
+- `/src/lib`: Axios configurations and utility functions.
+- `/src/services`: API abstraction layer.

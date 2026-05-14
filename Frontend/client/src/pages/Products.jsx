@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "../components/Sidebar";
 import { Navbar } from "../components/Navbar";
 import { Button } from "../components/Button";
@@ -6,11 +6,12 @@ import { Modal, ConfirmDialog } from "../components/Modal";
 import { useToast } from "../components/Toast";
 import { Search, Plus, Edit, Trash2, Package, AlertTriangle, Filter, Save, Upload } from "lucide-react";
 import productService from "../services/productService";
+import suppliersService from "../services/suppliersService";
 
 const categories = ["Tools", "Hardware", "Painting", "Adhesives", "Materials"];
-const suppliers = ["ForgeCo", "SteelMart", "ColorSync", "Grip&Go", "SmoothCraft"];
 
 export const Products = () => {
+  const [suppliers, setSuppliers] = useState(["ForgeCo", "SteelMart", "ColorSync", "Grip&Go", "SmoothCraft"]);
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,7 +21,7 @@ export const Products = () => {
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const fileInputRef = React.useRef(null);
+  const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     sku: "",
     name: "",
@@ -44,8 +45,20 @@ export const Products = () => {
     }
   };
 
+  const loadSuppliers = async () => {
+    try {
+      const data = await suppliersService.getAll();
+      if (data && data.length > 0) {
+        setSuppliers(data.map(s => s.name));
+      }
+    } catch (err) {
+      console.error("Failed to load suppliers", err);
+    }
+  };
+
   useEffect(() => {
     loadProducts();
+    loadSuppliers();
   }, []);
 
   const formatCurrency = (amount) => {
