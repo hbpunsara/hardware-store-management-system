@@ -61,14 +61,28 @@ export const Sales = () => {
   const handleExport = () => {
     try {
       const headers = ["Invoice ID", "Date", "Time", "Items", "Total", "Payment Method"];
-      const rows = filteredSales.map(s => [
-        `INV-${s.id}`,
-        s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "-",
-        s.createdAt ? new Date(s.createdAt).toLocaleTimeString() : "-",
-        s.items?.length || 0,
-        s.total || 0,
-        s.paymentMethod || "cash"
-      ]);
+      const rows = filteredSales.map(s => {
+        let paymentFormatted = "Cash";
+        try {
+          const methods = typeof s.paymentMethod === 'string' ? JSON.parse(s.paymentMethod) : s.paymentMethod;
+          if (Array.isArray(methods)) {
+            paymentFormatted = methods.map(m => m.method).join(" + ");
+          } else {
+            paymentFormatted = s.paymentMethod || "Cash";
+          }
+        } catch (e) {
+          paymentFormatted = s.paymentMethod || "Cash";
+        }
+
+        return [
+          `INV-${s.id}`,
+          s.createdAt ? new Date(s.createdAt).toLocaleDateString() : "-",
+          s.createdAt ? new Date(s.createdAt).toLocaleTimeString() : "-",
+          s.items?.length || 0,
+          s.total || 0,
+          paymentFormatted
+        ];
+      });
       const csvContent = [headers, ...rows].map(r => r.join(",")).join("\n");
       const blob = new Blob([csvContent], { type: "text/csv" });
       const url = URL.createObjectURL(blob);

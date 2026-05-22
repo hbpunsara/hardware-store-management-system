@@ -75,8 +75,8 @@ export const Dashboard = () => {
         ]);
 
       setSummary(summaryData);
-      setRecentSales(salesData.slice(0, 5));
-      setLowStockItems(productsData.filter((p) => p.stock <= 10).slice(0, 4));
+      setRecentSales([...salesData].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5));
+      setLowStockItems(productsData.filter((p) => p.stock <= 10).sort((a, b) => a.stock - b.stock).slice(0, 4));
       setWeeklyTrend(trendData);
       setCategoryData(overviewData.categoryData ?? []);
       setAvgOrderValue(overviewData.avgOrderValue ?? 0);

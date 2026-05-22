@@ -99,16 +99,39 @@ export const Finance = () => {
     }
   };
 
-  const filteredTransactions = transactions.filter(t =>
+  const getDateFilteredTransactions = () => {
+    const now = new Date();
+    return transactions.filter(t => {
+      if (!t.date) return true;
+      const tDate = new Date(t.date);
+      if (dateRange === "today") {
+        return tDate.toDateString() === now.toDateString();
+      }
+      if (dateRange === "week") {
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        return tDate >= startOfWeek;
+      }
+      if (dateRange === "month") {
+        return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+      }
+      return true;
+    });
+  };
+
+  const dateFilteredTransactions = getDateFilteredTransactions();
+
+  const filteredTransactions = dateFilteredTransactions.filter(t =>
     filterType === "all" || t.type === filterType
   );
 
-  const totalIncome = transactions.filter(t => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
-  const totalExpense = transactions.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
+  const totalIncome = dateFilteredTransactions.filter(t => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+  const totalExpense = dateFilteredTransactions.filter(t => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
   const netProfit = totalIncome - totalExpense;
 
   const expenseByCategory = {};
-  transactions.filter(t => t.type === "expense").forEach(t => {
+  dateFilteredTransactions.filter(t => t.type === "expense").forEach(t => {
     expenseByCategory[t.category] = (expenseByCategory[t.category] || 0) + t.amount;
   });
   const expenseTotal = Object.values(expenseByCategory).reduce((a, b) => a + b, 0);
@@ -169,7 +192,7 @@ export const Finance = () => {
     { label: "Total Revenue", value: `LKR ${formatCurrency(totalIncome)}`, change: totalIncome > 0 ? `+${profitMargin}%` : "—", trend: "up", icon: TrendingUp, color: "bg-[#7AC143]" },
     { label: "Total Expenses", value: `LKR ${formatCurrency(totalExpense)}`, change: totalExpense > 0 ? `${Math.round((totalExpense / Math.max(totalIncome, 1)) * 100)}%` : "—", trend: "down", icon: TrendingDown, color: "bg-[#E60012]" },
     { label: "Net Profit", value: `LKR ${formatCurrency(netProfit)}`, change: netProfit >= 0 ? `${profitMargin}% margin` : "Loss", trend: netProfit >= 0 ? "up" : "down", icon: Wallet, color: "bg-[#0AB5CD]" },
-    { label: "Transactions", value: transactions.length.toString(), change: `${transactions.length} total`, trend: "up", icon: PiggyBank, color: "bg-[#F5A623]" },
+    { label: "Transactions", value: dateFilteredTransactions.length.toString(), change: `${dateFilteredTransactions.length} total`, trend: "up", icon: PiggyBank, color: "bg-[#F5A623]" },
   ];
 
   return (
@@ -198,7 +221,7 @@ export const Finance = () => {
               <Button variant="secondary" onClick={() => {
                 try {
                   const headers = ["Date", "Description", "Category", "Method", "Type", "Amount"];
-                  const rows = transactions.map(t => [t.date, t.description, t.category, t.method, t.type, t.amount]);
+                  const rows = dateFilteredTransactions.map(t => [t.date, t.description, t.category, t.method, t.type, t.amount]);
                   const csvContent = [headers, ...rows].map(r => r.join(",")).join("\n");
                   const blob = new Blob([csvContent], { type: "text/csv" });
                   const url = URL.createObjectURL(blob);
@@ -391,11 +414,11 @@ export const Finance = () => {
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
                     <span className="text-gray-600">Income Entries</span>
-                    <span className="font-bold text-gray-900">{transactions.filter(t => t.type === "income").length} records</span>
+                    <span className="font-bold text-gray-900">{dateFilteredTransactions.filter(t => t.type === "income").length} records</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
                     <span className="text-gray-600">Expense Entries</span>
-                    <span className="font-bold text-[#F5A623]">{transactions.filter(t => t.type === "expense").length} records</span>
+                    <span className="font-bold text-[#F5A623]">{dateFilteredTransactions.filter(t => t.type === "expense").length} records</span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-gray-50 rounded-xl">
                     <span className="text-gray-600">Net Position</span>
